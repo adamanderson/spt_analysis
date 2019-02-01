@@ -1,2 +1,7 @@
 *.ipynb
 .ipynb_checkpoints
+*~
+*#
+*png
+*pkl
+__pycache__
