@@ -1,0 +1,6 @@
+These are the module-level bolometer matching fixes suggested by Daniel Dutcher for the 2019 HWM:
+005/10 : change Sq4 <-> Sq1
+005/14: change Sq4 <-> Sq1
+015/5: change Sq4 <-> Sq1 and change Sq8 <-> Sq7
+015/11 change Sq5 <-> Sq6
+015/13 change Sq8 <-> Sq7
