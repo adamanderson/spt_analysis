@@ -30,7 +30,19 @@ cal_obsids = {63084862: {'fast point': 63077834},
               64685912: {'fast point': 64678194,
                          'very fast point': 64685310},
               64701072: {'fast point': 64693360,
-                         'very fast point': 64700476},}
+                         'very fast point': 64700476},
+              64716070: {'fast point': 64708356,
+                         'very fast point': 64715473},
+              65041359: {'fast point': 65033646,
+                         'very fast point': 65040762},
+              65106264: {'fast point': 65098550,
+                         'very fast point': 65105667},
+              65118448: {'fast point': 65110734,
+                         'very fast point': 65117851},
+              65134617: {'fast point': 65126904,
+                         'very fast point': 65134020},
+              65146903: {'fast point': 65139189,
+                         'very fast point': 65146306},}
 
 
 class CalFixer(object):
