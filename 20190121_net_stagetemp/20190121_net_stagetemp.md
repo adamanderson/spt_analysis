@@ -18,6 +18,7 @@ from spt3g import core, dfmux, calibration
 import numpy as np
 import os.path
 import matplotlib.pyplot as plt
+import matplotlib
 ```
 
 ```python
@@ -194,6 +195,50 @@ len(all_nets)
 
 ```python
 print('\'\'\'')
+```
+
+```python
+# W203
+for obsid in obsids:
+    new_noise_file = 'noise_corrected/{}_processed_noise.g3'.format(obsid)
+    if os.path.exists(new_noise_file):
+        d = [fr for fr in core.G3File(new_noise_file)]
+        bps = [fr for fr in core.G3File('/spt/data/bolodata/fullrate/noise/{}/offline_calibration.g3'
+                                        .format(obsid))][0]["BolometerProperties"]
+        _ = plot_noise(d[0], bps, obsid, bywafer=False, wafer='w203',
+                       filestub='NET_{}_{}_el'.format(metadata[obsid]['elevation'], 'w203'))
+    plt.close('all')
+```
+
+```python
+d = [fr for fr in core.G3File('noise_corrected/{}_processed_noise.g3'.format(63098693))]
+data = plot_noise(d[0], bps, 63098693, bywafer=False,
+                  filestub='NET_{}_{}_el'.format(metadata[63098693]['elevation'], 'w203'))
+```
+
+```python
+matplotlib.rcParams.update({'font.size': 13})
+for jband, band in enumerate([90, 150, 220]):
+    noise = data[band]
+    plt.hist(noise[noise>200], bins=np.linspace(0, 2500, 61),
+             histtype='stepfilled',
+             alpha=0.5, color='C{}'.format(jband), linewidth=1.5)
+    plt.hist(noise[noise>200], bins=np.linspace(0, 2500, 61),
+             label='{} GHz'.format(band), histtype='step',
+             color='C{}'.format(jband), linewidth=1.5)
+plt.xlim([0, 2500])
+plt.legend(frameon=False)
+plt.xlabel('NET [$\mu K \sqrt{s}$]')
+plt.ylabel('bolometers')
+plt.setp(list(plt.gca().spines.values()), linewidth=1.5)
+plt.gca().xaxis.set_tick_params(width=1.5)
+plt.gca().yaxis.set_tick_params(width=1.5)
+plt.tight_layout()
+plt.savefig('net_update.png', dpi=200)
+```
+
+```python
+plt.gca().spines
 ```
 
 ```python
