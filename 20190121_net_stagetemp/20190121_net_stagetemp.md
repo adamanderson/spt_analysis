@@ -19,6 +19,7 @@ import numpy as np
 import os.path
 import matplotlib.pyplot as plt
 import matplotlib
+from glob import glob
 ```
 
 ```python
@@ -50,10 +51,12 @@ obsids = list(metadata.keys())
 ```python
 for obsid in obsids:
     new_noise_file = 'noise_corrected/{}_processed_noise.g3'.format(obsid)
-    if os.path.exists(new_noise_file):
+    offlinecal_fname = '/spt/data/bolodata/downsampled/noise/' + \
+                       '{}/offline_calibration.g3' .format(obsid)
+    if os.path.exists(offlinecal_fname) and \
+       os.path.exists(new_noise_file):
         d = [fr for fr in core.G3File(new_noise_file)]
-        bps = [fr for fr in core.G3File('/spt/data/bolodata/fullrate/noise/{}/offline_calibration.g3'
-                                        .format(obsid))][0]["BolometerProperties"]
+        bps = [fr for fr in core.G3File(offlinecal_fname)][0]["BolometerProperties"]
         _ = plot_noise(d[0], bps, obsid, bywafer=False,
                        filestub='NET_{}_el'.format(metadata[obsid]['elevation']))
     plt.close('all')
@@ -61,10 +64,12 @@ for obsid in obsids:
 data = {}
 for obsid in obsids:
     new_noise_file = 'noise_corrected/{}_processed_noise.g3'.format(obsid)
-    if os.path.exists(new_noise_file):
+    offlinecal_fname = '/spt/data/bolodata/downsampled/noise/' + \
+                       '{}/offline_calibration.g3' .format(obsid)
+    if os.path.exists(offlinecal_fname) and \
+       os.path.exists(new_noise_file):
         d = [fr for fr in core.G3File(new_noise_file)]
-        bps = [fr for fr in core.G3File('/spt/data/bolodata/fullrate/noise/{}/offline_calibration.g3'
-                                        .format(obsid))][0]["BolometerProperties"]
+        bps = [fr for fr in core.G3File(offlinecal_fname)][0]["BolometerProperties"]
         data[obsid] = plot_noise(d[0], bps, obsid, bywafer=True,
                                  filestub='NET_bywafer_{}_el'.format(metadata[obsid]['elevation']))
     plt.close('all')
@@ -237,8 +242,119 @@ plt.tight_layout()
 plt.savefig('net_update.png', dpi=200)
 ```
 
+## Some plots by wafer for the March F2F
+
 ```python
-plt.gca().spines
+# only works with matplotlib version in v3 clustertools
+
+for obsid in data:
+    ...:     plt.figure(1, figsize=(10,4))
+    ...:     for band in [90, 150, 220]:
+    ...:         all_nets = np.array([])
+    ...:         wafers_plot = []
+    ...:         nets_plot = []
+    ...:         nets_1sigmalow = []
+    ...:         nets_1sigmahigh = []
+    ...:         try:
+    ...:             for wafer in wafer_list:
+    ...:                 nets = data[obsid][wafer][band]
+    ...:                 nets_plot.append(np.median(nets))
+    ...:                 nets_1sigmalow.append(np.median(nets) - np.percentile(nets, 16))
+    ...:                 nets_1sigmahigh.append(np.percentile(nets, 84) - np.median(nets))
+    ...:                 wafers_plot.append(wafer)
+    ...:             plt.errorbar(nets_plot, wafers_plot, xerr=np.array([nets_1sigmalow, nets_1sigmahigh]), linestyle='None', marker='o', capsize=2, capthick=2)
+    ...:         except:
+    ...:             pass
+    ...:     plt.xlim([0, 2500])
+    ...:     plt.xlabel('NET [$\mu$K$\sqrt{s}$]')
+    ...:     plt.ylabel('wafer')
+    ...:     plt.title(obsid)
+    ...:     plt.tight_layout()
+    ...:     plt.savefig('net_wafer_summary_{}.png'.format(obsid), dpi=200)
+    ...:     plt.close()
+```
+
+```python
+import pickle
+with open('net_skim.pkl', 'wb') as f:
+    pickle.dump(data, f)
+```
+
+```python
+data_sept_2018 = {}
+obsids_sept_2018 = [fname.split('/')[-1] for fname in glob('/spt/data/bolodata/downsampled/noise/53*')]
+for obsid in obsids_sept_2018:
+    noise_file = '/spt/user/production/calibration/noise/{}.g3' .format(obsid)
+    offlinecal_fname = '/spt/data/bolodata/downsampled/noise/' + \
+                       '{}/offline_calibration.g3' .format(obsid)
+    if os.path.exists(offlinecal_fname) and \
+       os.path.exists(noise_file):
+        d = [fr for fr in core.G3File(noise_file)]
+        bps = [fr for fr in core.G3File(offlinecal_fname)][0]["BolometerProperties"]
+        data_sept_2018[obsid] = plot_noise(d[0], bps, obsid, bywafer=False,
+                                 filestub='NET_')
+    plt.close('all')
+    
+
+```
+
+```python
+new_noise_file = 'noise_corrected/63689042_processed_noise.g3'.format(obsid)
+offlinecal_fname = '/spt/data/bolodata/fullrate/noise/63689042/offline_calibration.g3'
+bps = [fr for fr in core.G3File(offlinecal_fname)][0]["BolometerProperties"]
+d = [fr for fr in core.G3File(new_noise_file)]
+data_2019 = plot_noise(d[0], bps, 63098693, bywafer=False,
+                       filestub='NET_63689042_')
+```
+
+```python
+matplotlib.rcParams.update({'font.size': 13})
+for jband, band in enumerate([90, 150, 220]):
+    noise_2018 = data_sept_2018['53614387'][band]
+    noise_2019 = data_2019[band]
+#     plt.hist(noise[noise>200], bins=np.linspace(0, 2500, 61),
+#              histtype='stepfilled',
+#              alpha=0.5, color='C{}'.format(jband), linewidth=1.5)
+    plt.hist(noise_2018[noise_2018>200], bins=np.linspace(0, 2500, 61),
+             label='{} GHz (Sept. 2018)'.format(band), histtype='step',
+             color='C{}'.format(jband), linewidth=1.5, linestyle='--')
+    plt.hist(noise_2019[noise_2019>200], bins=np.linspace(0, 2500, 61),
+             label='{} GHz (Jan. 2019)'.format(band), histtype='step',
+             color='C{}'.format(jband), linewidth=1.5)
+plt.xlim([0, 2500])
+plt.legend(frameon=False)
+plt.xlabel('NET [$\mu K \sqrt{s}$]')
+plt.ylabel('bolometers')
+plt.setp(list(plt.gca().spines.values()), linewidth=1.5)
+plt.gca().xaxis.set_tick_params(width=1.5)
+plt.gca().yaxis.set_tick_params(width=1.5)
+plt.tight_layout()
+plt.savefig('net_2018_vs_2019.png', dpi=200)
+```
+
+```python
+matplotlib.rcParams.update({'font.size': 13})
+for jband, band in enumerate([90, 150, 220]):
+    noise_2018 = data_sept_2018['53614387'][band]
+    noise_2019 = data_2019[band]
+#     plt.hist(noise[noise>200], bins=np.linspace(0, 2500, 61),
+#              histtype='stepfilled',
+#              alpha=0.5, color='C{}'.format(jband), linewidth=1.5)
+    plt.hist(noise_2018[noise_2018>200], bins=np.linspace(0, 2500, 121),
+             label='{} GHz (Sept. 2018)'.format(band), histtype='step',
+             color='C{}'.format(jband), linewidth=1.5, linestyle='--')
+    plt.hist(noise_2019[noise_2019>200], bins=np.linspace(0, 2500, 121),
+             label='{} GHz (Jan. 2019)'.format(band), histtype='step',
+             color='C{}'.format(jband), linewidth=1.5)
+plt.xlim([200, 1250])
+plt.legend(frameon=False)
+plt.xlabel('NET [$\mu K \sqrt{s}$]')
+plt.ylabel('bolometers')
+plt.setp(list(plt.gca().spines.values()), linewidth=1.5)
+plt.gca().xaxis.set_tick_params(width=1.5)
+plt.gca().yaxis.set_tick_params(width=1.5)
+plt.tight_layout()
+plt.savefig('net_2018_vs_2019_zoom.png', dpi=200)
 ```
 
 ```python

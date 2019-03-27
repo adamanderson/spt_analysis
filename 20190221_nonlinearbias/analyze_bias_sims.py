@@ -7,8 +7,8 @@ import os.path
 from glob import glob
 
 
-fname_nobias = 'sim_cl_bias_none.pkl'
-fname_bias = 'sim_cl_bias_linear_2.67.pkl'
+fname_nobias = 'data/sim_cl_bias_none.pkl'
+fname_bias = 'data/sim_cl_bias_linear_2.67.pkl'
 
 with open(fname_nobias, 'rb') as f:
     d_nobias = pickle.load(f)
@@ -16,29 +16,29 @@ with open(fname_nobias, 'rb') as f:
 with open(fname_bias, 'rb') as f:
     d_bias = pickle.load(f)
 
-# plot maps
-for fname in glob('*g3'):
-    dmap = [fr for fr in core.G3File(fname)]
+# # plot maps
+# for fname in glob('*g3'):
+#     dmap = [fr for fr in core.G3File(fname)]
 
-    plt.figure(figsize=(12,6))
-    plt.imshow(dmap[0]['T'], vmin=-700, vmax=700)
-    plt.colorbar()
-    plt.tight_layout()
-    plt.savefig('figures/{}.png'.format(os.path.splitext(fname)[0]), dpi=200)
-    plt.close()
+#     plt.figure(figsize=(12,6))
+#     plt.imshow(dmap[0]['T'], vmin=-700, vmax=700)
+#     plt.colorbar()
+#     plt.tight_layout()
+#     plt.savefig('figures/{}.png'.format(os.path.splitext(fname)[0]), dpi=200)
+#     plt.close()
 
 
 # plot power spectra
-for spectrum in ['TT', 'TE', 'EE', 'BB']:
+for spectrum in ['TT', 'TE', 'TB', 'EE', 'EB', 'BB']:
     for sim_fname in d_nobias.keys():
         avg_cls_nobias = np.zeros(d_nobias[sim_fname]['ell'].shape)
         for sim_fname in d_nobias:
-            avg_cls_nobias = avg_cls_nobias + d_nobias[sim_fname][spectrum]
+            avg_cls_nobias = avg_cls_nobias + d_nobias[sim_fname][spectrum] / len(d_nobias)
 
         sim_fnames = list(d_bias.keys())
         avg_cls_bias = np.zeros(d_bias[sim_fname]['ell'].shape)
         for sim_fname in d_bias:
-            avg_cls_bias = avg_cls_bias + d_bias[sim_fname][spectrum]
+            avg_cls_bias = avg_cls_bias + d_bias[sim_fname][spectrum] / len(d_nobias)
 
     ell_nobias = d_nobias[sim_fname]['ell']
     ell_bias = d_bias[sim_fname]['ell']
@@ -59,12 +59,13 @@ for spectrum in ['TT', 'TE', 'EE', 'BB']:
              'o-', fillstyle='none', color='C1', label='linear bias', markersize=3, linewidth=1)
     plt.grid()
     plt.legend()
-    plt.ylabel('D_\ell^{} [\mu K^2]'.format(spectrum))
+    plt.ylabel(r'$D_{{\ell}}^{{ {} }}$ [$\mu K^2$]'.format(spectrum))
 
     ax2 = plt.subplot(gs1[4, :])
     plt.plot(ell_nobias, avg_cls_bias/avg_cls_nobias / bias_normalization)
     plt.grid()
-    plt.xlabel('\mathcal{\ell}')
+    plt.xlabel(r'$\ell$')
     plt.ylabel('[linear bias] / [no bias]')
+    plt.tight_layout()
     plt.savefig('figures/{}_linear_bias.png'.format(spectrum), dpi=200)
     plt.close()
