@@ -49,7 +49,7 @@ for fname in filenames:
 ```
 
 ```python
-for spectrum in ['TT', 'EE', 'TE', 'BB']:
+for spectrum in ['TT', 'EE', 'TE', 'TB', 'EB', 'BB']:
     plt.figure(figsize=(12,6))
     all_cls_median = {}
     all_cls_up1sigma = {}
@@ -90,7 +90,7 @@ for spectrum in ['TT', 'EE', 'TE', 'BB']:
         all_cls_ratio_up1sigma[bias_mag] = cls_ratio_up1sigma
         all_cls_ratio_down1sigma[bias_mag] = cls_ratio_down1sigma
         
-        if spectrum == 'TE':
+        if spectrum in ['TE', 'EB', 'TB']:
             plt.plot(ells, cls_median * ells*(ells+1) / (2.*np.pi),
                      label='{}% bias / deg'.format(bias_mag))
         else:
@@ -119,6 +119,8 @@ for spectrum in ['TT', 'EE', 'TE', 'BB']:
                      label='{}% bias / deg'.format(bias_mag))
     if spectrum == 'TE':
         plt.ylim([0.9, 1.5])
+    if spectrum in ['EB', 'TB']:
+        plt.ylim([0, 2])
     plt.title(spectrum) 
     plt.grid()
     plt.xlabel('$\ell$')
@@ -139,8 +141,11 @@ data_params = {}
 for fname in filenames:
     print(fname)
     nsky = int(os.path.basename(fname).split('_')[1].split('.')[0])
-    with open(fname, 'rb') as f:
-        data_params[nsky] = pickle.load(f)
+    try:
+        with open(fname, 'rb') as f:
+            data_params[nsky] = pickle.load(f)
+    except:
+        print('Failed to load file.')
 ```
 
 ```python
@@ -304,6 +309,29 @@ for spectrum in ['TT', 'EE', 'BB']:
 
 ```python
 ells
+```
+
+## Plots of bias
+For presentation purposes, let's make a plot of the bias amplitude as a function of elevation. Let's just lift this from the script used for grid processing.
+
+```python
+cal_decs = np.linspace(-71, -41, 4+1)
+decs = np.linspace(-71, -41, 1000)
+bias_param = np.ones(1000)
+for j in range(len(bias_param)):
+    bias_param[j] = 1 + 0.02 * (np.min(cal_decs[cal_decs>=decs[j]]) - decs[j])
+```
+
+```python
+cal_decs
+```
+
+```python
+plt.plot(decs, bias_param)
+plt.xlabel('dec [deg]')
+plt.ylabel('relative gain')
+plt.title('slice of gain variation in dec (2% / deg)')
+plt.savefig('gain_variation_slice.png', dpi=200)
 ```
 
 ```python
