@@ -195,24 +195,24 @@ pipe.Add(mapmaker.mapmakerutils.CalculatePointing,
          pointing_store_key = 'PixelPointing', trans_key='OnlineRaDecRotation',
          ts_map_key = 'PreCMTimestreams')
 
-# Timestream filtering
-pipe.Add(mapmaker.TodFiltering,
-         # filtering options
-         poly_order = 5,
-         filters_are_ell_based = True, 
-         mhpf_cutoff = 50, lpf_filter_frequency = 10000,
-         point_source_mask_id = ps_map_id,
-         # boiler plate
-         ts_in_key='PreCMTimestreams',
-         ts_out_key = 'PolyFilteredTimestreams', 
-         point_source_pointing_store_key = 'PixelPointing',
-         use_dynamic_source_filter = False,
-         boresight_az_key='OnlineBoresightAz',
-         boresight_el_key='OnlineBoresightEl')
+# # Timestream filtering
+# pipe.Add(mapmaker.TodFiltering,
+#          # filtering options
+#          poly_order = 5,
+#          filters_are_ell_based = True, 
+#          mhpf_cutoff = 50, lpf_filter_frequency = 10000,
+#          point_source_mask_id = ps_map_id,
+#          # boiler plate
+#          ts_in_key='PreCMTimestreams',
+#          ts_out_key = 'PolyFilteredTimestreams', 
+#          point_source_pointing_store_key = 'PixelPointing',
+#          use_dynamic_source_filter = False,
+#          boresight_az_key='OnlineBoresightAz',
+#          boresight_el_key='OnlineBoresightEl')
 
 # Calculate Weights
 pipe.Add(std_processing.weighting.AddPSDWeights,
-         input = 'PolyFilteredTimestreams', output = 'TodWeights',
+         input = 'PreCMTimestreams', output = 'TodWeights',
          low_f = 0.75 * core.G3Units.Hz,
          high_f = 8 * core.G3Units.Hz)
 
@@ -223,12 +223,12 @@ pipe.Add(timestreamflagging.flaggingutils.SigmaclipFlagGroupG3MapValue,
 
 pipe.Add(timestreamflagging.GenerateFlagStats, flag_key = 'Flags')
 pipe.Add(timestreamflagging.RemoveFlagged, 
-         input_ts_key = 'PolyFilteredTimestreams',
+         input_ts_key = 'PreCMTimestreams',
          input_flag_key = 'Flags',
          output_ts_key = 'DeflaggedTimestreams')
 
 # More clean-up
-pipe.Add(core.Delete, keys=['PolyFilteredTimestreams','PreCMTimestreams'])
+pipe.Add(core.Delete, keys=['PreCMTimestreams'])
 
 if args.lr:
     # split left and right scans if requested

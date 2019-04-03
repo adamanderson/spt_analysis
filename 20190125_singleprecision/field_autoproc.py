@@ -144,11 +144,11 @@ def ts_check(fr, ts_key):
             return False
 pipe.Add(ts_check, ts_key = 'PreCMTimestreams')
 
-# # Common-mode filter
-# pipe.Add(todfilter.polyutils.CommonModeFilter(
-#     in_ts_map_key = 'PreCMTimestreams',
-#     out_ts_map_key = 'CMFilteredTimestreams',
-#     per_band = True, per_wafer = True, per_squid = False))
+# Common-mode filter
+pipe.Add(todfilter.polyutils.CommonModeFilter(
+    in_ts_map_key = 'PreCMTimestreams',
+    out_ts_map_key = 'CMFilteredTimestreams',
+    per_band = True, per_wafer = True, per_squid = False))
 
 # Clean-up as we go
 pipe.Add(core.Delete, keys= ['RawTimestreams_I','CalTimestreams'])
@@ -193,7 +193,7 @@ pipe.Add(
 pipe.Add(mapmaker.mapmakerutils.CalculatePointing, 
          map_id = 'bsmap', 
          pointing_store_key = 'PixelPointing', trans_key='OnlineRaDecRotation',
-         ts_map_key = 'PreCMTimestreams')
+         ts_map_key = 'CMFilteredTimestreams')
 
 # Timestream filtering
 pipe.Add(mapmaker.TodFiltering,
@@ -203,7 +203,7 @@ pipe.Add(mapmaker.TodFiltering,
          mhpf_cutoff = 50, lpf_filter_frequency = 10000,
          point_source_mask_id = ps_map_id,
          # boiler plate
-         ts_in_key='PreCMTimestreams',
+         ts_in_key='CMFilteredTimestreams',
          ts_out_key = 'PolyFilteredTimestreams', 
          point_source_pointing_store_key = 'PixelPointing',
          use_dynamic_source_filter = False,
@@ -228,7 +228,7 @@ pipe.Add(timestreamflagging.RemoveFlagged,
          output_ts_key = 'DeflaggedTimestreams')
 
 # More clean-up
-pipe.Add(core.Delete, keys=['PolyFilteredTimestreams','PreCMTimestreams'])
+pipe.Add(core.Delete, keys=['PolyFilteredTimestreams','CMFilteredTimestreams'])
 
 if args.lr:
     # split left and right scans if requested

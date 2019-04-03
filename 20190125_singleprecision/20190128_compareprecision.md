@@ -22,24 +22,19 @@ from spt3g import core, mapmaker, dfmux, calibration
 ```python
 df_single = {fr['Id']: fr for fr in core.G3File('singleprecision/64502043_maps.g3')
              if 'Id' in fr.keys()}
-df_double = {fr['Id']: fr for fr in core.G3File('doubleprecision/64502043_maps.g3')
+df_double = {fr['Id']: fr for fr in core.G3File('doubleprecision/64502043_maps_v0.g3')
              if 'Id' in fr.keys()}
 ```
 
 ```python
-for fr in df_single:
+for fr in df_double:
     print(fr)
 ```
 
 ```python
-for fr in df_double:
-    print(fr['Id'])
-```
-
-```python
 plt.figure(figsize=(12,6))
-plt.imshow(np.abs(df_single['Left-90GHz']['T'] - df_double['Left-90GHz']['T']) / \
-           df_double['Left-90GHz']['T'],
+plt.imshow(np.abs(df_single['90GHz']['T'] - df_double['90GHz']['T']) / \
+           df_double['90GHz']['T'],
            vmin=0, vmax=1.0)
 plt.ylim([100,600])
 plt.axis([800, 850, 400, 450])
@@ -102,6 +97,15 @@ for jband, band in enumerate(list(df_single.keys())):
         plt.colorbar()
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig('{}_diff_full.png'.format(band), dpi=200)
+```
+
+```python
+plt.imshow(df_double['220GHz']['T'],
+           vmin=0, vmax=1.0)
+```
+
+```python
+df_single['GHz']['T'][20000]
 ```
 
 ```python
