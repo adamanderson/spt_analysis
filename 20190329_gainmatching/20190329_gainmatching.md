@@ -22,8 +22,8 @@ $$
 where $A$ is a free gain-matching parameter. We want to choose an $A$ that provides "optimal" gain-matching in some sense. Ultimately, the entire purpose of gain-matching is to reduce 1/f noise, so it is natural to choose $A$ such that the noise in some low-frequency interval is minimized. In other words, we want to find
 $$
 \begin{align}
-\hat{A} &= \underset{A}{\arg\max} \sum_{i \in F} \left| \tilde{d}_-(f_i) \right|^2 \\
-&= \underset{A}{\arg\max} \sum_{i \in F} \left| \tilde{d}_x(f_i) - A \tilde{d}_y(f_i) \right|^2
+\hat{A} &= \underset{A}{\arg\min} \sum_{i \in F} \left| \tilde{d}_-(f_i) \right|^2 \\
+&= \underset{A}{\arg\min} \sum_{i \in F} \left| \tilde{d}_x(f_i) - A \tilde{d}_y(f_i) \right|^2
 \end{align}
 $$
 
@@ -32,7 +32,7 @@ $$
 \begin{align}
 0 &= \frac{d}{dA}  \sum_{i \in F} \left(\tilde{d}^*_x(f_i) - A \tilde{d}^*_y(f_i) \right) \left(\tilde{d}_x(f_i) - A \tilde{d}_y(f_i) \right) |_{A = \hat{A}}\\
 0 &=\sum_{i \in F} 2 \hat{A} \tilde{d}^*_y(f_i)\tilde{d}_y(f_i) - \tilde{d}^*_x(f_i)\tilde{d}_y(f_i) - \tilde{d}^*_y(f_i)\tilde{d}_x(f_i)\\
-\hat{A} &= \frac{\sum_{i \in F} \left(\tilde{d}^*_x(f_i)\tilde{d}_y(f_i) + \tilde{d}^*_y(f_i)\tilde{d}_x(f_i) \right)}{\tilde{d}^*_y(f_i)\tilde{d}_y(f_i)}
+\hat{A} &= \frac{\sum_{i \in F} \left(\tilde{d}^*_x(f_i)\tilde{d}_y(f_i) + \tilde{d}^*_y(f_i)\tilde{d}_x(f_i) \right)}{\sum_{i \in F} \tilde{d}^*_y(f_i)\tilde{d}_y(f_i)}
 \end{align}
 $$
 
@@ -50,22 +50,34 @@ from scipy.signal import welch
 %matplotlib inline
 ```
 
+```python
+from spt3g.calibration.template_groups import get_template_groups
+
+d = [fr for fr in core.G3File('/spt/data/bolodata/fullrate/noise/68609192/offline_calibration.g3')]
+bps = d[0]['BolometerProperties']
+groups = get_template_groups(bps, per_pixel=True, per_wafer=True, include_keys=True)
+good_pairs = []
+for group, pair in groups.items():
+    if len(pair) == 2:
+        good_pairs.append(pair)
+```
+
+## Identify good polarization pairs
+Let's write a pipeline segment to do some flagging and identify good polarization pairs for gain-matching analysis.
+
+```python
+
+pipe = core.G3Pipeline()
+pipe.Add(core.G3Reader, filename=['/spt/data/bolodata/fullrate/noise/68609192/offline_calibration.g3',
+                                  '/spt/data/bolodata/fullrate/noise/68609192/0000.g3'])
+pipe.Add(core.FlagIncompletePixelPairs)
+pipe.Add(core.)
+```
+
 ## Quick test of method with a noise stare
 
 ```python
-# load a recent noise stare for an interactive test
-
-# find some polarization pairs
-calpath = '/spt/data/bolodata/downsampled/ra0hdec-67.25/'
-obsid = 70194145
-calfile = '{}/{}/offline_calibration.g3'.format(calpath, obsid)
-caldata = [fr for fr in core.G3File(calfile)]
-bps = caldata[0]['BolometerProperties']
-
-bolonames = np.array(list(bps.keys()))
-physical_name = np.array([bps[bolo].physical_name for bolo in bolonames])
-print(bolonames[physical_name == 'w177_152.150.x'])
-print(bolonames[physical_name == 'w177_152.150.y'])
+good_pairs
 ```
 
 ```python
@@ -74,7 +86,7 @@ reload(adama_utils)
 
 ```python
 # get the timestreams
-ts_data = adama_utils.get_raw_timestreams(['2019.q9c', '2019.jbu'], 70252900, file_name='0000.g3', scan_num=[3],
+ts_data = adama_utils.get_raw_timestreams(['2019.038', '2019.1fv'], 70005920, file_name='0000.g3', scan_num=[0],
                               plot=False, data=True, cut_turnarounds=False,
                               psd=False, units=core.G3TimestreamUnits.Tcmb)
 ```
@@ -84,15 +96,15 @@ ts_data
 ```
 
 ```python
-ff, psd = welch(ts_data['2019.jbu'], fs=152.5, nperseg=1024*4)
+ff, psd = welch(ts_data['2019.038'], fs=152.5, nperseg=1024)
 plt.loglog(ff, psd)
-ff, psd = welch(ts_data['2019.q9c'], fs=152.5, nperseg=1024*4)
+ff, psd = welch(ts_data['2019.1fv'], fs=152.5, nperseg=1024)
 plt.loglog(ff, psd)
 ```
 
 ```python
-tsx = ts_data['2019.q9c'] - np.mean(ts_data['2019.q9c'])
-tsy = ts_data['2019.jbu'] - np.mean(ts_data['2019.jbu'])
+tsx = ts_data['2019.038'] - np.mean(ts_data['2019.038'])
+tsy = ts_data['2019.1fv'] - np.mean(ts_data['2019.1fv'])
 ```
 
 ```python
@@ -115,6 +127,7 @@ plt.loglog(ff, psd)
 plt.plot(tsx)
 plt.plot(tsy)
 plt.plot(tsx - Ahat*tsy)
+plt.xlim([0,300])
 ```
 
 ```python
