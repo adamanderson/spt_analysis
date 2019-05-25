@@ -1,5 +1,5 @@
 from spt3g import core, std_processing, calibration
-from spt3g.std_processing.gainmatching import match_gains, difference_pairs
+from spt3g.std_processing.gainmatching import match_gains, difference_pairs, sum_pairs
 import os.path
 
 datapath = '/spt/data/bolodata/fullrate/noise/68609192/'
@@ -19,5 +19,8 @@ pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
 pipe.Add(difference_pairs, ts_key = 'CalTimestreams',
          gain_match_key = 'GainMatchCoeff',
          pair_diff_key='PairDiffTimestreams')
+pipe.Add(sum_pairs, ts_key = 'CalTimestreams',
+         gain_match_key = 'GainMatchCoeff',
+         pair_diff_key='PairSumTimestreams')
 pipe.Add(core.G3Writer, filename='gain_match_test.g3')
 pipe.Run()
