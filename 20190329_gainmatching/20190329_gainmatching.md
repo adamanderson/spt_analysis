@@ -15,11 +15,14 @@ jupyter:
 # Fourier-space gain-matching
 We would ideally gain-match using a continuously-running optical signal which would monitor the instantaneous gain of the detectors in each polarization pair. In the limit that we are not doing this, we need to gain-match to another optical signal present in each scan of the telescope. On a scan-by-scan basis, the power spectrum of a bolometer timestream consists of a.) a relatively flat noise floor dominated by photon noise with a non-negligible readout noise component, and b.) a 1/f component that is dominated by optical atmospheric fluctuations with possible contributions from exotic readout noise terms. This situation leaves us with only one option: we must gain-match on the 1/f noise, implicitly assuming that it is due to optical signals.
 
-Let $d_x(t)$ and $d_y(t)$ be the two detector timestreams in a polarization pair. The gain-matched pair-differenced timestream is given by:
+Let $d_x(t)$ and $d_y(t)$ be the two detector timestreams in a polarization pair. Define the gain-matched pair-summed and pair-differenced timestream by:
 $$
-d_-(t) = d_x(t) - Ad_y(t),
+d_+(t) = C (d_x(t) + Ad_y(t))
+d_-(t) = C (d_x(t) - Ad_y(t))
 $$
-where $A$ is a free gain-matching parameter. We want to choose an $A$ that provides "optimal" gain-matching in some sense. Ultimately, the entire purpose of gain-matching is to reduce 1/f noise, so it is natural to choose $A$ such that the noise in some low-frequency interval is minimized. In other words, we want to find
+where $A$ is a free gain-matching parameter, and after fixing $A$ we set $C$ to normalize the pair-summed timestream to be equal to pre-gain matched pair-summed timestream. Note that this choice of normalization convention is not necessarily unique. In our calibration pipeline, a relative gain-matching error between x and y implies that the absolute calibration of x and y has an error, so the absolute calibration of the sum must also have an error. But gain-matching only improves the relative calibration, and it does nothing about absolute calibration. 
+
+We want to choose an $A$ that provides "optimal" gain-matching in some sense. Ultimately, the entire purpose of gain-matching is to reduce 1/f noise, so it is natural to choose $A$ such that the noise in some low-frequency interval is minimized. In other words, we want to find
 $$
 \begin{align}
 \hat{A} &= \underset{A}{\arg\min} \sum_{i \in F} \left| \tilde{d}_-(f_i) \right|^2 \\
@@ -32,20 +35,28 @@ $$
 \begin{align}
 0 &= \frac{d}{dA}  \sum_{i \in F} \left(\tilde{d}^*_x(f_i) - A \tilde{d}^*_y(f_i) \right) \left(\tilde{d}_x(f_i) - A \tilde{d}_y(f_i) \right) |_{A = \hat{A}}\\
 0 &=\sum_{i \in F} 2 \hat{A} \tilde{d}^*_y(f_i)\tilde{d}_y(f_i) - \tilde{d}^*_x(f_i)\tilde{d}_y(f_i) - \tilde{d}^*_y(f_i)\tilde{d}_x(f_i)\\
-\hat{A} &= \frac{\sum_{i \in F} \left(\tilde{d}^*_x(f_i)\tilde{d}_y(f_i) + \tilde{d}^*_y(f_i)\tilde{d}_x(f_i) \right)}{\sum_{i \in F} \tilde{d}^*_y(f_i)\tilde{d}_y(f_i)}
+\hat{A} &= \frac{\sum_{i \in F} \left(\tilde{d}^*_x(f_i)\tilde{d}_y(f_i) + \tilde{d}^*_y(f_i)\tilde{d}_x(f_i) \right)}{\sum_{i \in F} 2\tilde{d}^*_y(f_i)\tilde{d}_y(f_i)}
 \end{align}
+$$
+
+Having fixed the gain-matching parameter $A$, we can compute the normalization parameter $C$ from the constraint that the power of the new pair-summed timestream must be equal to the old pair-summed timestream:
+$$
+\sum_{i \in F} \left| C(\tilde{d}^*_x(f_i) + \tilde{d}^*_y(f_i)) \right|^2 = \sum_{i \in F} \left| \tilde{d}^*_x(f_i) + \hat{A}\tilde{d}^*_y(f_i) \right|^2 \\
+C = \sqrt{\frac{\sum_{i \in F} \left| \tilde{d}^*_x(f_i) + \hat{A}\tilde{d}^*_y(f_i) \right|^2}{\sum_{i \in F} \left|\tilde{d}^*_x(f_i) + \tilde{d}^*_y(f_i)\right|^2}}
 $$
 
 Let's implement this in a noise stare and then perform some Monte Carlo simulations to check for biases and optimality.
 
 ```python
 from spt3g import core, dfmux, calibration
+from spt3g.todfilter import dftutils
 import numpy as np
 import matplotlib.pyplot as plt
 import os.path
 import adama_utils
 from importlib import reload
-from scipy.signal import welch
+from scipy.signal import welch, periodogram
+from scipy.optimize import curve_fit, newton, bisect
 
 %matplotlib inline
 ```
@@ -66,7 +77,6 @@ for group, pair in groups.items():
 Let's write a pipeline segment to do some flagging and identify good polarization pairs for gain-matching analysis.
 
 ```python
-
 pipe = core.G3Pipeline()
 pipe.Add(core.G3Reader, filename=['/spt/data/bolodata/fullrate/noise/68609192/offline_calibration.g3',
                                   '/spt/data/bolodata/fullrate/noise/68609192/0000.g3'])
@@ -128,6 +138,143 @@ plt.plot(tsx)
 plt.plot(tsy)
 plt.plot(tsx - Ahat*tsy)
 plt.xlim([0,300])
+```
+
+## Fitting PSDs
+The other thing that we would like to do after gain-matching is to fit the 1/f knee of the timestreams. Let's write some prototype code on test timestreams, then we'll write a production version of the code.
+
+```python
+d = list(core.G3File('gain_match_test_timestreams.g3'))
+```
+
+```python
+f, psd_diff = welch(d[4]["PairDiffTimestreams"]['2019.7zn_2019.dbl'], fs=152.5, nperseg=2048)
+f, psd_sum = welch(d[4]["PairSumTimestreams"]['2019.7zn_2019.dbl'], fs=152.5, nperseg=2048)
+f_pg, pg_diff = periodogram(d[4]["PairDiffTimestreams"]['2019.7zn_2019.dbl'], fs=152.5, window='hanning')
+f_pg, pg_sum = periodogram(d[4]["PairSumTimestreams"]['2019.7zn_2019.dbl'], fs=152.5, window='hanning')
+
+plt.figure(1)
+plt.loglog(f, np.sqrt(psd_diff) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6)
+plt.loglog(f, np.sqrt(psd_sum) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6)
+
+plt.figure(2)
+plt.loglog(f_pg, np.sqrt(pg_diff) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6)
+plt.loglog(f_pg, np.sqrt(pg_sum) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6)
+plt.ylim([10, 1e5])
+```
+
+```python
+def readout_noise(x, readout):
+    return readout*np.ones(len(x))
+def photon_noise(x, photon, tau):
+    return photon / np.sqrt(1 + 2*np.pi*((x*tau)**2))
+def atm_noise(x, A, alpha):
+    return A * (x)**(-1*alpha)
+def noise_model(x, readout, A, alpha, photon, tau):
+    return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
+```
+
+```python
+par, cov = curve_fit(noise_model,
+                     f[(f>0) & (f<60)],
+                     np.sqrt(psd_sum[(f>0) & (f<60)]) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6,
+                     bounds=(0, np.inf))
+```
+
+```python
+plt.loglog(f, np.sqrt(psd_diff) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6, label='x - y')
+plt.loglog(f, np.sqrt(psd_sum) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6, label='x + y')
+plt.plot(f, noise_model(f,*par), 'k--', label='total')
+plt.plot(f, np.sqrt(readout_noise(f,par[0])**2 + \
+                    photon_noise(f,par[3],par[4])**2),
+         'C2--', label='readout + photon')
+plt.plot(f, atm_noise(f,par[1],par[2]), 'C4--',
+         label='atmospheric ($f^{-\\alpha}$)')
+plt.ylim([100, 1e4])
+plt.legend()
+```
+
+```python
+plt.loglog(f_pg, np.sqrt(pg_diff) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6, label='x - y')
+plt.loglog(f_pg, np.sqrt(pg_sum) / (1. / np.sqrt(core.G3Units.Hz)) * 1e6, label='x + y')
+plt.plot(f_pg, noise_model(f_pg,*par), 'k--', label='total')
+plt.plot(f_pg, np.sqrt(readout_noise(f_pg,par[0])**2 + \
+                       photon_noise(f_pg,par[3],par[4])**2),
+         'C2--', label='readout + photon')
+plt.plot(f_pg, atm_noise(f_pg,par[1],par[2]), 'C4--',
+         label='atmospheric ($f^{-\\alpha}$)')
+plt.ylim([10, 1e5])
+plt.legend()
+```
+
+```python
+par
+```
+
+```python
+d = list(core.G3File('gain_match_fit_test.g3'))
+```
+
+```python
+for bolo in d[4]["SumPSDFitParams"].keys():
+    print(d[4]["SumPSDFitParams"][bolo])
+```
+
+```python
+testpar = [192.323, 46.0894, 2.07056, 119.257, 0.0188139]
+plt.loglog(f, noise_model(f,*testpar), 'k--', label='total')
+```
+
+## Scratch work
+
+```python
+fr = list(core.G3File('gain_match_fit_test_73798315.g3'))[1]
+```
+
+```python
+def noise_model(x, readout, A, alpha, photon, tau):
+    return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
+def knee_func(x, readout, A, alpha, photon, tau):
+    return (A * (x)**(-1*alpha)) - np.sqrt(photon**2 / (1 + 2*np.pi*((x*tau)**2)) + readout**2)
+
+
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+for group in fr['AverageASDDiff'].keys():
+    if group != 'frequency':
+        band = float(group.split('_')[0])
+        
+        plt.figure(band_numbers[band], figsize=(15,6))
+        plt.subplot(2, 5, subplot_numbers[band])
+        ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+        asd_diff = np.array(fr['AverageASDDiff'][group])
+        ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
+        asd_sum = np.array(fr['AverageASDSum'][group])
+
+        par_diff = fr["AverageASDDiffFitParams"][group]
+        par_sum = fr["AverageASDSumFitParams"][group]
+        plt.loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
+        plt.loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
+        plt.loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
+        plt.loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+        
+#         f_knee = bisect(knee_func, a=0.01, b=0.5, args=tuple(par_diff))
+#         plt.title('{}, {} GHz ($f_{{knee}}^{{diff}}$ = {:.3f})'.format(group.split('_')[1],
+#                                                            int(float((group.split('_')[0]))),
+#                                                            f_knee))
+        plt.tight_layout()
+        plt.xlabel('frequency [Hz]')
+        plt.ylabel('NET [uK$\sqrt{s}$]')
+        plt.legend()
+        plt.ylim([2e2,1e5])
+        
+        subplot_numbers[band] +=1
+        
+#         print('{}: {:.3f} Hz'.format(group.replace('.0_', ' '), f_knee))
+        
+for band, jplot in band_numbers.items():
+    plt.figure(jplot)
+    plt.savefig('pair_differenced_{}_75722403.png'.format(int(band)), dpi=200)
 ```
 
 ```python
