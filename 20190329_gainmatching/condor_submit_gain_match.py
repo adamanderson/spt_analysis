@@ -31,8 +31,8 @@ if args.fullrate:
     out_root = '/spt/user/adama/20190329_gainmatching/fullrate/'
 else:
     out_root = '/spt/user/adama/20190329_gainmatching/downsampled/'
-job_root = 'noise_gainmatching'
-script = '/home/adama/SPT/spt_analysis/20190329_gainmatching/'
+job_root = 'gainmatching'
+script = '/home/adama/SPT/spt_analysis/20190329_gainmatching/test_gain_match_and_fit.py'
 
 bolodata_path = '/spt/data/bolodata/fullrate/'
 
@@ -51,7 +51,7 @@ for source, obsid in zip(sources, obsids):
 
     if all(os.path.exists(fn) for fn in infiles):
         args_in = [os.path.basename(dat) for dat in infiles]
-        args = '{infiles} -o {outfile} -s {source} -r 2.0 -x 75 -y 50 -lr' \
+        args = '{infiles} -o {outfile}' \
               .format(infiles = ' '.join(args_in), 
                       outfile = job_name+'.g3',
                       source = source)
