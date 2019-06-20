@@ -37,10 +37,10 @@ def photon_noise(x, photon, tau):
 def atm_noise(x, A, alpha):
     return A * (x)**(-1*alpha)
 def noise_model(x, readout, A, alpha, photon, tau):
-    return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
+    return np.sqrt(readout + (A * (x)**(-1*alpha)) + photon / (1 + 2*np.pi*((x*tau)**2)))
 
 def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
-            min_freq=0, max_freq=60):
+            min_freq=0, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01)):
     if frame.type == core.G3FrameType.Scan and asd_key in frame.keys():
         for group in frame[asd_key].keys():
             if group != 'frequency':
@@ -54,8 +54,9 @@ def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
                     par, cov = curve_fit(noise_model,
                                          f[(f>min_freq) & (f<max_freq)],
                                          asd[(f>min_freq) & (f<max_freq)],
-                                         bounds=(0, np.inf),
-                                         p0=(200, 10, 1, 400, 0.01))
+                                         bounds=([0, 0, 0, 0, 0],
+                                                 [np.inf, np.inf, np.inf, np.inf, 0.1]),
+                                         p0=params0)
                 except RuntimeError:
                     par = []
 
@@ -135,14 +136,14 @@ pipe.Add(sum_pairs, ts_key = 'CalTimestreams',
          pair_diff_key='PairSumTimestreams')
 pipe.Add(average_asd, ts_key='PairSumTimestreams', avg_psd_key='AverageASDSum')
 pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
-         min_freq=0.1, max_freq=60)
+         min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01))
 
 pipe.Add(difference_pairs, ts_key = 'CalTimestreams',
          gain_match_key = 'GainMatchCoeff',
          pair_diff_key='PairDiffTimestreams')
 pipe.Add(average_asd, ts_key='PairDiffTimestreams', avg_psd_key='AverageASDDiff')
 pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
-         min_freq=0.1, max_freq=60)
+         min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
 
 pipe.Add(core.Dump)
 pipe.Add(cleanup, to_save=['GainMatchCoeff',
