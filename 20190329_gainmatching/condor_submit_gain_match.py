@@ -65,7 +65,8 @@ for source, obsid in zip(sources, obsids):
                                                     output_files = [job_name+'.g3'],
                                                     request_disk = job_disk,
                                                     request_memory = job_ram,
-                                                    clustertools_version = 'py3-v3')
+                                                    clustertools_version = 'py3-v3',
+                                                    spt3g_env=True)
 
     else:
         print('Not processing observation {}:'.format(obsid))

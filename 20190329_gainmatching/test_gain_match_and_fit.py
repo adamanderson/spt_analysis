@@ -146,8 +146,11 @@ pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams'
          min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
 
 pipe.Add(core.Dump)
+# pipe.Add(cleanup, to_save=['GainMatchCoeff',
+#                            'PairSumTimestreams', 'SumASDFitParams', 'AverageASDSum', 'AverageASDSumFitParams',
+#                            'PairDiffTimestreams', 'DiffASDFitParams', 'AverageASDDiff', 'AverageASDDiffFitParams'])
 pipe.Add(cleanup, to_save=['GainMatchCoeff',
-                           'PairSumTimestreams', 'SumASDFitParams', 'AverageASDSum', 'AverageASDSumFitParams',
-                           'PairDiffTimestreams', 'DiffASDFitParams', 'AverageASDDiff', 'AverageASDDiffFitParams'])
+                           'SumASDFitParams', 'AverageASDSum', 'AverageASDSumFitParams',
+                           'DiffASDFitParams', 'AverageASDDiff', 'AverageASDDiffFitParams'])
 pipe.Add(core.G3Writer, filename=args.output)
 pipe.Run()

@@ -57,6 +57,7 @@ import adama_utils
 from importlib import reload
 from scipy.signal import welch, periodogram
 from scipy.optimize import curve_fit, newton, bisect
+from glob import glob
 
 %matplotlib inline
 ```
@@ -141,7 +142,11 @@ plt.xlim([0,300])
 ```
 
 ## Fitting PSDs
-The other thing that we would like to do after gain-matching is to fit the 1/f knee of the timestreams. Let's write some prototype code on test timestreams, then we'll write a production version of the code.
+The other thing that we would like to do after gain-matching is to fit the 1/f knee of the timestreams. Let's write some prototype code on test timestreams, then we'll write a production version of the code. The model that we use is from an old SPT thesis, ultimately derived from something Brad used for SPT-SZ:
+
+$$
+\textrm{NEP}(f) = \sqrt{A_{\textrm{white}} + A_{\textrm{red}} f^{-\alpha} + \frac{A_{\textrm{photon}}}{1 + 2\pi (f \tau)^2}}
+$$
 
 ```python
 d = list(core.G3File('gain_match_test_timestreams.g3'))
@@ -225,27 +230,37 @@ testpar = [192.323, 46.0894, 2.07056, 119.257, 0.0188139]
 plt.loglog(f, noise_model(f,*testpar), 'k--', label='total')
 ```
 
-## Scratch work
+## Plotting pair-summed vs. pair-differenced ASDs
 
 ```python
 fr = list(core.G3File('gain_match_fit_test_73798315.g3'))[1]
 ```
 
 ```python
+def readout_noise(x, readout):
+    return np.sqrt(readout)*np.ones(len(x))
+def photon_noise(x, photon, tau):
+    return np.sqrt(photon / (1 + 2*np.pi*((x*tau)**2)))
+def atm_noise(x, A, alpha):
+    return np.sqrt(A * (x)**(-1*alpha))
 def noise_model(x, readout, A, alpha, photon, tau):
-    return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
+    return np.sqrt(readout + (A * (x)**(-1*alpha)) + photon / (1 + 2*np.pi*((x*tau)**2)))
+#     return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
 def knee_func(x, readout, A, alpha, photon, tau):
-    return (A * (x)**(-1*alpha)) - np.sqrt(photon**2 / (1 + 2*np.pi*((x*tau)**2)) + readout**2)
+    return (A * (x)**(-1*alpha)) - photon / (1 + 2*np.pi*((x*tau)**2)) - readout
 
 
 band_numbers = {90.: 1, 150.: 2, 220.: 3}
 subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
-for group in fr['AverageASDDiff'].keys():
-    if group != 'frequency':
-        band = float(group.split('_')[0])
+
+for jband, band in enumerate([90., 150., 220.]):
+    fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
+    ax = ax.flatten()
+    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                    'w181', 'w188', 'w203', 'w204', 'w206']):
+        group = '{:.1f}_{}'.format(band, wafer)
         
-        plt.figure(band_numbers[band], figsize=(15,6))
-        plt.subplot(2, 5, subplot_numbers[band])
+#         plt.subplot(2, 5, subplot_numbers[band])
         ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
         asd_diff = np.array(fr['AverageASDDiff'][group])
         ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
@@ -253,28 +268,161 @@ for group in fr['AverageASDDiff'].keys():
 
         par_diff = fr["AverageASDDiffFitParams"][group]
         par_sum = fr["AverageASDSumFitParams"][group]
-        plt.loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
-        plt.loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
-        plt.loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
-        plt.loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+        ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
+        ax[jwafer].loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
+        ax[jwafer].loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
+        ax[jwafer].loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+#         ax[jwafer].loglog(ff_sum, readout_noise(ff_sum, par_sum[0]), 'k--')
+#         ax[jwafer].loglog(ff_sum, atm_noise(ff_sum, par_sum[1], par_sum[2]), 'k--')
+#         ax[jwafer].loglog(ff_sum, photon_noise(ff_sum, par_sum[3], par_sum[4]), 'k--')
         
-#         f_knee = bisect(knee_func, a=0.01, b=0.5, args=tuple(par_diff))
-#         plt.title('{}, {} GHz ($f_{{knee}}^{{diff}}$ = {:.3f})'.format(group.split('_')[1],
-#                                                            int(float((group.split('_')[0]))),
-#                                                            f_knee))
-        plt.tight_layout()
-        plt.xlabel('frequency [Hz]')
-        plt.ylabel('NET [uK$\sqrt{s}$]')
-        plt.legend()
-        plt.ylim([2e2,1e5])
+        try:
+            f_knee = bisect(knee_func, a=0.01, b=1.0, args=tuple(par_diff))
+            ax[jwafer].set_title('{}, {} GHz ($f_{{knee}}^{{diff}}$ = {:.3f}, '
+                                 '$\\alpha^{{diff}}={:.2f}$)'.format(group.split('_')[1],
+                                                             int(float((group.split('_')[0]))),
+                                                             f_knee, par_diff[2]))
+        except ValueError:
+            ax[jwafer].set_title('{}, {} GHz'.format(group.split('_')[1], int(float(group.split('_')[0]))))
+            
+#         plt.tight_layout()
+    for jwafer in [5,6,7,8,9]:
+        ax[jwafer].set_xlabel('frequency [Hz]')
+    
+    ax[0].set_ylabel('NET [uK$\sqrt{s}$]')
+    ax[5].set_ylabel('NET [uK$\sqrt{s}$]')
+    plt.ylim([2e2,1e5])
+    plt.legend()
+    plt.tight_layout()
         
-        subplot_numbers[band] +=1
+    subplot_numbers[band] +=1
         
-#         print('{}: {:.3f} Hz'.format(group.replace('.0_', ' '), f_knee))
         
 for band, jplot in band_numbers.items():
     plt.figure(jplot)
-    plt.savefig('pair_differenced_{}_75722403.png'.format(int(band)), dpi=200)
+    plt.savefig('pair_differenced_{}_75722403.png'.format(int(band)), dpi=120)
+```
+
+## Scratch work
+
+```python
+fr = list(core.G3File('/spt/user/adama/20190329_gainmatching/downsampled/gainmatching_noise_73124800.g3'))[1]
+```
+
+```python
+def readout_noise(x, readout):
+    return np.sqrt(readout)*np.ones(len(x))
+def photon_noise(x, photon, tau):
+    return np.sqrt(photon / (1 + 2*np.pi*((x*tau)**2)))
+def atm_noise(x, A, alpha):
+    return np.sqrt(A * (x)**(-1*alpha))
+def noise_model(x, readout, A, alpha, photon, tau):
+    return np.sqrt(readout + (A * (x)**(-1*alpha)) + photon / (1 + 2*np.pi*((x*tau)**2)))
+#     return np.sqrt(readout**2 + (A * (x)**(-1*alpha))**2 + photon**2 / (1 + 2*np.pi*((x*tau)**2)))
+def knee_func(x, readout, A, alpha, photon, tau):
+    return (A * (x)**(-1*alpha)) - photon / (1 + 2*np.pi*((x*tau)**2)) - readout
+
+```
+
+```python
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+
+for jband, band in enumerate([90., 150., 220.]):
+    fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
+    ax = ax.flatten()
+    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                    'w181', 'w188', 'w203', 'w204', 'w206']):
+        group = '{:.1f}_{}'.format(band, wafer)
+        
+#         plt.subplot(2, 5, subplot_numbers[band])
+        ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+        asd_diff = np.array(fr['AverageASDDiff'][group])
+        ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
+        asd_sum = np.array(fr['AverageASDSum'][group])
+
+        par_diff = fr["AverageASDDiffFitParams"][group]
+        par_sum = fr["AverageASDSumFitParams"][group]
+        ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
+        ax[jwafer].loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
+        ax[jwafer].loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
+        ax[jwafer].loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+#         ax[jwafer].loglog(ff_sum, readout_noise(ff_sum, par_sum[0]), 'k--')
+#         ax[jwafer].loglog(ff_sum, atm_noise(ff_sum, par_sum[1], par_sum[2]), 'k--')
+#         ax[jwafer].loglog(ff_sum, photon_noise(ff_sum, par_sum[3], par_sum[4]), 'k--')
+        
+        try:
+            f_knee = bisect(knee_func, a=0.01, b=1.0, args=tuple(par_diff))
+            ax[jwafer].set_title('{}, {} GHz ($f_{{knee}}^{{diff}}$ = {:.3f}, '
+                                 '$\\alpha^{{diff}}={:.2f}$)'.format(group.split('_')[1],
+                                                             int(float((group.split('_')[0]))),
+                                                             f_knee, par_diff[2]))
+        except ValueError:
+            ax[jwafer].set_title('{}, {} GHz'.format(group.split('_')[1], int(float(group.split('_')[0]))))
+            
+#         plt.tight_layout()
+    for jwafer in [5,6,7,8,9]:
+        ax[jwafer].set_xlabel('frequency [Hz]')
+    
+    ax[0].set_ylabel('NET [uK$\sqrt{s}$]')
+    ax[5].set_ylabel('NET [uK$\sqrt{s}$]')
+    plt.ylim([2e2,1e5])
+    plt.legend()
+    plt.tight_layout()
+        
+    subplot_numbers[band] +=1
+        
+        
+```
+
+```python
+noise_fnames = glob('/spt/user/adama/20190329_gainmatching/downsampled/*.g3')
+```
+
+```python
+f_knee_dict = {}
+for fname in noise_fnames:
+    print(fname)
+    fr = list(core.G3File(fname))[1]
+    
+    for jband, band in enumerate([90., 150., 220.]):
+        for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                        'w181', 'w188', 'w203', 'w204', 'w206']):
+            group = '{:.1f}_{}'.format(band, wafer)
+            
+            if band not in f_knee_dict:
+                f_knee_dict[band] = {}
+            if wafer not in f_knee_dict[band]:
+                f_knee_dict[band][wafer] = []
+                
+            try:
+                ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+                asd_diff = np.array(fr['AverageASDDiff'][group])
+                par_diff = fr["AverageASDDiffFitParams"][group]
+            
+                f_knee = bisect(knee_func, a=0.01, b=1.0, args=tuple(par_diff))
+                f_knee_dict[band][wafer].append(f_knee)
+            except:
+                pass
+                
+```
+
+```python
+for jband, band in enumerate(f_knee_dict):
+    fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
+    ax = ax.flatten()
+    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                    'w181', 'w188', 'w203', 'w204', 'w206']):
+        _ = ax[jwafer].hist(np.asarray(f_knee_dict[band][wafer])*1e3,
+                     bins=np.linspace(0,500,31),
+                     label=wafer, histtype='step')
+        ax[jwafer].set_title('{}, {} GHz'.format(wafer, int(band)))
+    plt.xlim([0, 500])
+    for j in [5,6,7,8,9]:
+        ax[j].set_xlabel('1/f knee [mHz]')
+    ax[0].set_ylabel('bolometers')
+    ax[5].set_ylabel('bolometers')
+    plt.savefig('figures_grid/fknee_noise_{}_{}.png'.format(int(band), wafer), dpi=200)
 ```
 
 ```python
