@@ -14,8 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('infiles', nargs='+', help='List of input files.')
 parser.add_argument('-o', '--output', default='output.g3',
                     help='Name of output file.')
-parser.add_argument('--gain-match', default='temperature',
-                    choices=['temperature', 'current'],
+parser.add_argument('--gain-match', action='store_true',
                     help='Calculate gain-matching coefficients.')
 parser.add_argument('--sum-pairs', action='store_true',
                     help='Calculate the pair-summed ASD.')
@@ -175,52 +174,46 @@ if args.poly_order:
 if args.units == 'current':
     pipe.Add(dfmux.ConvertTimestreamUnits, Input=post_poly_ts_key,
              Output='TimestreamsAmps', Units=core.G3TimestreamUnits.Current)
-
-pipe.Add(std_processing.flagsegments.FieldFlaggingPreKcmbConversion,
-         flag_key = 'Flags', ts_key = 'RawTimestreams_I')
-
-pipe.Add(std_processing.CalibrateRawTimestreams,
-         i_data_key = post_poly_ts_key,
-         output = 'CalTimestreams')
-
-pipe.Add(std_processing.flagsegments.FieldFlaggingPostKcmbConversion,
-         flag_key = 'Flags', ts_key = 'CalTimestreams')
-
-if args.gain_match == 'temperature':
-    pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
-             gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 1.0])
-elif args.gain_match == 'current':
-    pipe.Add(match_gains, ts_key = 'TimestreamsAmps', flag_key=None,
-             gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 0.1])
+    if args.gain_match:
+        pipe.Add(match_gains, ts_key = 'TimestreamsAmps', flag_key=None,
+                 gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 0.1])
+    ts_data_key = 'TimestreamsAmps'
+elif args.units == 'temperature':
+    pipe.Add(std_processing.flagsegments.FieldFlaggingPreKcmbConversion,
+             flag_key = 'Flags', ts_key = 'RawTimestreams_I')
+    pipe.Add(std_processing.CalibrateRawTimestreams,
+             i_data_key = post_poly_ts_key,
+             output = 'CalTimestreams')
+    pipe.Add(std_processing.flagsegments.FieldFlaggingPostKcmbConversion,
+             flag_key = 'Flags', ts_key = 'CalTimestreams')
+    if args.gain_match:
+        pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
+                 gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 1.0])
+    ts_data_key = 'CalTimestreams'
                     
 if args.sum_pairs:
-    pipe.Add(sum_pairs, ts_key = 'CalTimestreams',
+    pipe.Add(sum_pairs, ts_key = ts_data_key,
              gain_match_key = 'GainMatchCoeff',
              pair_diff_key='PairSumTimestreams')
     if args.average_asd:
-        pipe.Add(average_asd, ts_key='PairSumTimestreams', avg_psd_key='AverageASDSum')
+        pipe.Add(average_asd, ts_key='PairSumTimestreams', avg_psd_key='AverageASDSum', units=args.units)
         pipe.Add(core.Delete, keys='PairSumTimestreams')
     if args.fit_asd:
         pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
                  min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01))
 
 if args.diff_pairs:
-    pipe.Add(difference_pairs, ts_key = 'CalTimestreams',
+    pipe.Add(difference_pairs, ts_key = ts_data_key,
              gain_match_key = 'GainMatchCoeff',
              pair_diff_key='PairDiffTimestreams')
     if args.average_asd:
-        pipe.Add(average_asd, ts_key='PairDiffTimestreams', avg_psd_key='AverageASDDiff')
+        pipe.Add(average_asd, ts_key='PairDiffTimestreams', avg_psd_key='AverageASDDiff', units=args.units)
         pipe.Add(core.Delete, keys='PairDiffTimestreams')
     if args.fit_asd:
         pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
                  min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
 
-if args.average_asd:
-    if args.units == 'current':
-        ts_key = 'TimestreamsAmps'
-    elif args.units == 'temperature':
-        ts_key = 'CalTimestreams'
-    pipe.Add(average_asd, ts_key=ts_key, avg_psd_key='AverageASD', units=args.units)
+pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units)
 if args.fit_asd:
     if args.fit_readout_model:
         pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
@@ -234,6 +227,6 @@ pipe.Add(cleanup, to_save=['GainMatchCoeff',
                            'AverageASDSum', 'AverageASDSumFitParams',
                            'AverageASDDiff', 'AverageASDDiffFitParams',
                            'AverageASD', 'AverageASDFitParams',
-                           'TimestreamsAmps'])
+                           ts_data_key])
 pipe.Add(core.G3Writer, filename=args.output)
 pipe.Run()
