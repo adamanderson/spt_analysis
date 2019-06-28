@@ -147,13 +147,17 @@ def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
                 frame[params_key][group] = par
 
 
-@core.scan_func_cache_data(bolo_props = 'BolometerProperties')
-def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, units='temperature'):
+@core.scan_func_cache_data(bolo_props = 'BolometerProperties',
+                           wiring_map = 'WiringMap')
+def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring_map=None,
+                units='temperature',
+                average_per_wafer=True, average_per_band=True, average_per_squid=False):
     if frame.type == core.G3FrameType.Scan and \
        ts_key in frame.keys() and bolo_props is not None:
-        pixel_tgroups = get_template_groups(bolo_props,
+        pixel_tgroups = get_template_groups(bolo_props, wiring_map=wiring_map,
                                             per_band = True, per_pixel = True,
-                                            per_wafer = True, include_keys = True)
+                                            per_wafer = True, per_squid = True,
+                                            include_keys = True)
         wafers = np.unique([bolo_props[bolo].wafer_id for bolo in bolo_props.keys()])
         wafers = wafers[wafers!='']
         bands = np.unique([bolo_props[bolo].band/core.G3Units.GHz for bolo in bolo_props.keys()])
@@ -173,40 +177,39 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, units=
 
         ts = frame[ts_key]
         psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
+        n_pairs = {}
+        for pixel_id, bolonames in pixel_tgroups.items():
+            band, wafer, squid, pixel = pixel_id.split('_')
 
-        for wafer in wafers:
-            for band in bands:
-                group_key = '{:.1f}_{}'.format(band, wafer)
-                n_pairs = 0
-
-                for pixel_id in pixel_tgroups:
-                    pixel_band = float(pixel_id.split('_')[0])
-                    pixel_wafer = pixel_id.split('_')[1]
-                    if pixel_band == band and pixel_wafer == wafer:
-                        if pixel_id in frame[ts_key].keys():
-                            ts_keys = [pixel_id]
+            key_list = []
+            if average_per_band:
+                key_list.append(band)
+            if average_per_wafer:
+                key_list.append(wafer)
+            if average_per_squid:
+                key_list.append(squid)
+            group_key = '_'.join(key_list)
+            
+            for bolo in bolonames:
+                if bolo in frame[ts_key].keys():
+                    f_pg = freqs
+                    psd_pg = psds[bolo]
+                    asd_pg = np.sqrt(psd_pg) / units_factor
+                    
+                    # cut psds that are not finite or are zero
+                    if np.all(np.isfinite(asd_pg) & (asd_pg>0)):
+                        if group_key not in frame[avg_psd_key].keys():
+                            n_pairs[group_key] = 0
+                            frame[avg_psd_key][group_key] = asd_pg
                         else:
-                            ts_keys = [bolo for bolo in pixel_tgroups[pixel_id] 
-                                       if bolo in frame[ts_key].keys()]
+                            frame[avg_psd_key][group_key] += asd_pg
+                        n_pairs[group_key] += 1
+                        frame[avg_psd_key]['frequency'] = f_pg
 
-                        for ts_id in ts_keys:
-                            f_pg = freqs
-                            psd_pg = psds[ts_id]
-                            asd_pg = np.sqrt(psd_pg) / units_factor
+        for group_key in n_pairs.keys():
+            frame[avg_psd_key][group_key] /= float(n_pairs[group_key])
 
-                            # cut psds that are not finite or are zero
-                            if np.all(np.isfinite(asd_pg) & (asd_pg>0)):
-                                if group_key not in frame[avg_psd_key].keys():
-                                    frame[avg_psd_key][group_key] = core.G3MapVectorDouble()
-                                    frame[avg_psd_key][group_key] = asd_pg
-                                else:
-                                    frame[avg_psd_key][group_key] += asd_pg
-                                n_pairs += 1
-                                frame[avg_psd_key]['frequency'] = f_pg
 
-                if n_pairs > 0:
-                    frame[avg_psd_key][group_key] /= float(n_pairs)
-                    # frame[avg_psd_key][group_key] /= np.sqrt(2.) # rt(2) to normalize per-pair noise to per-bolo noise
 
 # internal names to handle optional filtering        
 if args.poly_order:
