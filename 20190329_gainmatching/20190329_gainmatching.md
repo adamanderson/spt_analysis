@@ -58,13 +58,12 @@ from importlib import reload
 from scipy.signal import welch, periodogram
 from scipy.optimize import curve_fit, newton, bisect
 from glob import glob
+from spt3g.calibration.template_groups import get_template_groups
 
 %matplotlib inline
 ```
 
 ```python
-from spt3g.calibration.template_groups import get_template_groups
-
 d = [fr for fr in core.G3File('/spt/data/bolodata/fullrate/noise/68609192/offline_calibration.g3')]
 bps = d[0]['BolometerProperties']
 groups = get_template_groups(bps, per_pixel=True, per_wafer=True, include_keys=True)
@@ -389,10 +388,7 @@ plt.savefig('figures_grid/gain_matching_coeffs_73124800.png', dpi=150)
 
 ```python
 fr = list(core.G3File('horizon_noise_77863968.g3'))[1]
-```
-
-```python
-print(fr)
+fr_poly1 = list(core.G3File('horizon_noise_77863968_poly1.g3'))[1]
 ```
 
 ```python
@@ -416,11 +412,14 @@ for jband, band in enumerate([90., 150., 220.]):
 #         plt.subplot(2, 5, subplot_numbers[band])
         ff = np.array(fr['AverageASD']['frequency']/core.G3Units.Hz)
         ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+        ff_poly1 = np.array(fr_poly1['AverageASD']['frequency']/core.G3Units.Hz)
         asd = np.array(fr['AverageASD'][group])
         asd_diff = np.array(fr['AverageASDDiff'][group]) / np.sqrt(2.)
+        asd_poly1 = np.array(fr_poly1['AverageASD'][group])
 
-        par = fr["AverageASDFitParams"][group]
-        ax[jwafer].loglog(ff, asd, label='all bolos')
+        par = fr_poly1["AverageASDFitParams"][group]
+#         ax[jwafer].loglog(ff, asd, label='all bolos (poly 0)')
+        ax[jwafer].loglog(ff_poly1, asd_poly1, label='all bolos (poly 1)')
         ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / \sqrt{2}')
         try:
             ax[jwafer].loglog(ff, horizon_model(ff, *list(par)), 'k--')
@@ -449,7 +448,7 @@ for jband, band in enumerate([90., 150., 220.]):
     
     ax[0].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
     ax[5].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
-    plt.ylim([1,200])
+    plt.ylim([1,1000])
     plt.legend()
     plt.tight_layout()
         
@@ -458,6 +457,65 @@ for jband, band in enumerate([90., 150., 220.]):
 for band, jplot in band_numbers.items():
     plt.figure(jplot)
     plt.savefig('figures_grid/horizon_noise_{}_77863968.png'.format(int(band)), dpi=120)
+```
+
+```python
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+
+
+A_sqrt_all = []
+alpha_all = []
+whitenoise_all = []
+# plt.figure(1)
+fig1, ax = plt.subplots(1, 3, sharex=False, sharey=True, num=1, figsize=(12,4))
+for jband, band in enumerate([90., 150., 220.]):
+    A_sqrt = []
+    alpha = []
+    whitenoise = []
+    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                    'w181', 'w188', 'w203', 'w204', 'w206']):
+        group = '{:.1f}_{}'.format(band, wafer)
+
+        par = fr_poly1["AverageASDFitParams"][group]
+        
+        whitenoise.append(np.sqrt(par[0]))
+        A_sqrt.append(np.sqrt(par[1]))
+        alpha.append(par[2])
+        
+        A_sqrt_all = np.hstack([A_sqrt_all, A_sqrt])
+        alpha_all = np.hstack([alpha_all, alpha])
+        whitenoise_all = np.hstack([whitenoise_all, whitenoise])
+        
+    _ = ax[0].hist(whitenoise, bins=np.linspace(5,25,21), alpha=0.5,
+                   label='{} GHz, median = {:.2f}'.format(band, np.median(whitenoise)))
+    ax[0].set_xlabel('white noise [pA/rtHz]')
+    ax[0].set_ylabel('groups')
+    _ = ax[1].hist(A_sqrt, bins=np.linspace(0, 3, 16), alpha=0.5,
+                   label='{} GHz, median = {:.2f}'.format(band, np.median(A_sqrt)))
+    ax[1].set_xlabel('$\sqrt{A}$ [pA/rtHz]')
+    _ = ax[2].hist(alpha, bins=np.linspace(0,4,16), alpha=0.5,
+                   label='{} GHz, median = {:.2f}'.format(band, np.median(alpha)))
+    ax[2].set_xlabel('$\\alpha$')
+ax[0].legend()
+ax[1].legend()
+ax[2].legend()
+
+plt.savefig('figures_grid/horizon_noise_params_77863968.png', dpi=120)
+
+# plt.figure(2)
+fig2, ax = plt.subplots(1, 3, sharex=False, sharey=True, num=2, figsize=(12,4))
+_ = ax[0].hist(whitenoise_all, bins=np.linspace(5,25,21), alpha=0.5)
+ax[0].set_xlabel('white noise [pA/rtHz]')
+ax[0].set_ylabel('groups')
+_ = ax[1].hist(A_sqrt_all, bins=np.linspace(0, 3, 16), alpha=0.5)
+ax[1].set_xlabel('$\sqrt{A}$ [pA/rtHz]')
+_ = ax[2].hist(alpha_all, bins=np.linspace(0,4,16), alpha=0.5)
+ax[2].set_xlabel('$\\alpha$')
+
+plt.tight_layout()
+
+
 ```
 
 ## Are we scanning fast enough?
@@ -493,6 +551,175 @@ $$
 r = 1 + \frac{1}{s-1} = \frac{s}{s-1}.
 $$
 I emphasize again that $s$ is a quantity that we measure: it is the 1/f knee of field scans divided by the 1/f knee of noise stares. The intuition here is also clear: if our 1/f knee in field scans is *way* higher than noise stares, then $s$ is large and atmosphere is changing much more slowly than we are scanning. That makes $r$ close to 1, so we have little room to improve by scanning yet faster.
+
+
+## 1/f in Field Scans
+
+```python
+fr = list(core.G3File('gainmatching_ra0hdec-67.25_76707699.g3'))
+
+```
+
+```python
+print(fr[20])
+```
+
+## Noise-to-carrier ratio
+
+```python
+# plots for split by squid
+d = list(core.G3File('horizon_noise_77863968_poly1_squid_split.g3'))
+```
+
+```python
+A_sqrt = []
+Irms = []
+alpha = []
+for g in d[1]["AvgCurrent"].keys():
+    par = d[1]["AverageASDFitParams"][g]
+    A_sqrt.append(np.sqrt(par[1]))
+    Irms.append(d[1]["AvgCurrent"][g])
+    alpha.append(par[2])
+A_sqrt = np.array(A_sqrt)
+Irms = np.array(Irms)
+NCR = A_sqrt / (Irms*1e12)
+alpha = np.array(alpha)
+```
+
+```python
+plt.figure(figsize=(12,3))
+plt.subplot(1,4,1)
+_ = plt.hist(A_sqrt, bins=np.linspace(0,3,16))
+plt.xlabel('$\sqrt{A}$ [pA/$\sqrt{Hz}]$')
+plt.subplot(1,4,2)
+_ = plt.hist(Irms*1e6, bins=np.linspace(0,3,16))
+plt.xlabel('average rms TES current [$\mu$A]')
+ax = plt.subplot(1,4,3)
+_ = plt.hist(NCR, bins=np.linspace(0,1.5e-6,16))
+ax.ticklabel_format(axis='x', style='sci')
+plt.xlabel('noise-to-carrier ratio [1/$\sqrt{Hz}$]')
+plt.subplot(1,4,4)
+_ = plt.hist(alpha, bins=np.linspace(0,4,16))
+plt.xlabel('$\\alpha$')
+
+plt.tight_layout()
+plt.savefig('figures_grid/NCR_squid_split.png', dpi=200)
+```
+
+```python
+# split by wafer/band
+d = list(core.G3File('horizon_noise_77863968_poly1_squidband_split.g3'))
+```
+
+```python
+A_sqrt = []
+Irms = []
+alpha = []
+for g in d[1]["AvgCurrent"].keys():
+    par = d[1]["AverageASDFitParams"][g]
+    A_sqrt.append(np.sqrt(par[1]))
+    Irms.append(d[1]["AvgCurrent"][g])
+    alpha.append(par[2])
+A_sqrt = np.array(A_sqrt)
+Irms = np.array(Irms)
+NCR = A_sqrt / (Irms*1e12)
+alpha = np.array(alpha)
+```
+
+```python
+plt.figure(figsize=(12,3))
+plt.subplot(1,4,1)
+_ = plt.hist(A_sqrt, bins=np.linspace(0,3,16))
+plt.xlabel('$\sqrt{A}$ [pA/$\sqrt{Hz}]$')
+plt.subplot(1,4,2)
+_ = plt.hist(Irms*1e6, bins=np.linspace(0,3,16))
+plt.xlabel('average rms TES current [$\mu$A]')
+ax = plt.subplot(1,4,3)
+_ = plt.hist(NCR, bins=np.linspace(0,1.5e-6,16))
+ax.ticklabel_format(axis='x', style='sci')
+plt.xlabel('noise-to-carrier ratio [1/$\sqrt{Hz}$]')
+plt.subplot(1,4,4)
+_ = plt.hist(alpha, bins=np.linspace(0,4,16))
+plt.xlabel('$\\alpha$')
+
+plt.tight_layout()
+plt.savefig('figures_grid/NCR_squidband_split.png', dpi=200)
+```
+
+## scratch work
+
+```python
+jplot = 0
+fr = d[1]
+freq = fr["AverageASD"]['frequency'] / core.G3Units.Hz
+for group, psd in fr["AverageASD"].items():
+    plt.figure(jplot)
+    plt.loglog(freq, psd)
+    par = fr["AverageASDFitParams"][group]
+    plt.loglog(ff, horizon_model(ff, *list(par)), 'k--')
+    plt.title(group)
+    plt.savefig('figures_grid/group_psd/{}.png'.format(group), dpi=120)
+    plt.close()
+```
+
+```python
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+
+for jband, band in enumerate([90., 150., 220.]):
+    fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
+    ax = ax.flatten()
+    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                    'w181', 'w188', 'w203', 'w204', 'w206']):
+        group = '{:.1f}_{}'.format(band, wafer)
+        
+#         plt.subplot(2, 5, subplot_numbers[band])
+        ff = np.array(fr['AverageASD']['frequency']/core.G3Units.Hz)
+        ff_poly1 = np.array(fr_poly1['AverageASD']['frequency']/core.G3Units.Hz)
+        asd = np.array(fr['AverageASD'][group])
+        asd_poly1 = np.array(fr_poly1['AverageASD'][group])
+
+        par = fr_poly1["AverageASDFitParams"][group]
+#         ax[jwafer].loglog(ff, asd, label='all bolos (poly 0)')
+        ax[jwafer].loglog(ff_poly1, asd_poly1, label='all bolos (poly 1)')
+        try:
+            ax[jwafer].loglog(ff, horizon_model(ff, *list(par)), 'k--')
+        except:
+            pass
+
+        ax[jwafer].set_title('{}, {} GHz, white noise = {:.1f} pA$ / \sqrt{{Hz}}$'.format(group.split('_')[1],
+                                                                       int(float(group.split('_')[0])),
+                                                                       np.mean(asd[(ff>10) & (ff<15)])))
+        try:
+            f_knee = bisect(horizon_knee_func, a=0.001, b=1.0, args=tuple(par))
+            ax[jwafer].set_title('{}, {} GHz\nwhite noise = {:.1f} '
+                                 'pA$ / \sqrt{{Hz}}$ '
+                                 '$f_{{knee}}^{{all}}$ = {:.3f}'.format(group.split('_')[1],
+                                                             int(float(group.split('_')[0])),
+                                                             np.mean(asd[(ff>10) & (ff<15)]),
+                                                                         f_knee))
+        except:
+            ax[jwafer].set_title('{}, {} GHz\nwhite noise = {:.1f} '
+                                 'pA$ / \sqrt{{Hz}}$'.format(group.split('_')[1],
+                                                             int(float(group.split('_')[0])),
+                                                             np.mean(asd[(ff>10) & (ff<15)])))
+            
+    for jwafer in [5,6,7,8,9]:
+        ax[jwafer].set_xlabel('frequency [Hz]')
+    
+    ax[0].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
+    ax[5].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
+    plt.ylim([1,1000])
+    plt.legend()
+    plt.tight_layout()
+        
+    subplot_numbers[band] +=1
+        
+```
+
+```python
+d[1]["AvgCurrent"].keys()
+```
 
 ```python
 

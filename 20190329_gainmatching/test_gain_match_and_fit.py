@@ -34,6 +34,12 @@ parser.add_argument('--fit-readout-model', action='store_true',
 parser.add_argument('--calc-avg-current', action='store_true',
                     help='Calculate the average current of each bolometer '
                     'group and store it in the output frame.')
+parser.add_argument('--group-by-wafer', action='store_true',
+                    help='When computing PSD averages, group by wafer.')
+parser.add_argument('--group-by-band', action='store_true',
+                    help='When computing PSD averages, group by band.')
+parser.add_argument('--group-by-squid', action='store_true',
+                    help='When computing PSD averages, group by squid.')
 args = parser.parse_args()
 
 
@@ -61,55 +67,38 @@ def noise_model(x, readout, A, alpha, photon, tau):
 def full_readout_model(x, readout, A, alpha):
     return np.sqrt(readout + (A * (x)**(-1*alpha)))
 
-@core.scan_func_cache_data(bolo_props = 'BolometerProperties')
+@core.scan_func_cache_data(bolo_props = 'BolometerProperties',
+                           wiring_map = 'WiringMap')
 def calc_avg_current(frame, ts_key='TimestreamAmps',
-                     output_key='AvgCurrent', bolo_props=None):
+                     output_key='AvgCurrent', bolo_props=None, wiring_map=None,
+                     average_per_wafer=True, average_per_band=True, average_per_squid=False):
     if frame.type == core.G3FrameType.Scan and \
        ts_key in frame.keys() and bolo_props is not None:
-        pixel_tgroups = get_template_groups(bolo_props,
-                                            per_band = True,
-                                            per_wafer = True, include_keys = True)
-        wafers = np.unique([bolo_props[bolo].wafer_id for bolo in bolo_props.keys()])
-        wafers = wafers[wafers!='']
-        bands = np.unique([bolo_props[bolo].band/core.G3Units.GHz for bolo in bolo_props.keys()])
-        bands = bands[bands>0]
-        group_keys = ['{:.1f}_{}'.format(band, wafer) for band in bands for wafer in wafers]
-
-        units_factor = core.G3Units.amp
+        pixel_tgroups = get_template_groups(bolo_props, wiring_map=wiring_map,
+                                            per_band = average_per_band,
+                                            per_wafer = average_per_wafer,
+                                            per_squid = average_per_squid,
+                                            include_keys = True)
 
         frame[output_key] = core.G3MapDouble()
 
-        ts = frame[ts_key]
-
-        for wafer in wafers:
-            for band in bands:
-                group_key = '{:.1f}_{}'.format(band, wafer)
-                n_bolos = 0
-
-                for bolo_id in pixel_tgroups:
-                    pixel_band = float(bolo_id.split('_')[0])
-                    pixel_wafer = bolo_id.split('_')[1]
-                    if pixel_band == band and pixel_wafer == wafer:
-                        if bolo_id in frame[ts_key].keys():
-                            ts_keys = [bolo_id]
+        n_bolos = {}
+        for group_key, bolonames in pixel_tgroups.items():            
+            for bolo in bolonames:
+                if bolo in frame[ts_key].keys():
+                    current = np.median(frame[ts_key][bolo])
+                    
+                    # cut psds that are not finite or are zero
+                    if np.isfinite(current) & (current>0):
+                        if group_key not in frame[output_key].keys():
+                            n_bolos[group_key] = 0
+                            frame[output_key][group_key] = current
                         else:
-                            ts_keys = [bolo for bolo in pixel_tgroups[bolo_id] 
-                                       if bolo in frame[ts_key].keys()]
+                            frame[output_key][group_key] += current
+                        n_bolos[group_key] += 1
 
-                        for ts_id in ts_keys:
-                            current = np.median(ts[ts_id]) / units_factor
-
-                            # cut tods that are not finite or are zero
-                            if np.isfinite(current) & (current>0):
-                                if group_key not in frame[output_key].keys():
-                                    frame[output_key][group_key] = current
-                                else:
-                                    frame[output_key][group_key] += current
-                                n_bolos += 1
-
-                if n_bolos > 0:
-                    frame[output_key][group_key] /= float(n_bolos)
-
+        for group_key in n_bolos.keys():
+            frame[output_key][group_key] /= float(n_bolos[group_key])
 
 
 def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
@@ -155,14 +144,10 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring
     if frame.type == core.G3FrameType.Scan and \
        ts_key in frame.keys() and bolo_props is not None:
         pixel_tgroups = get_template_groups(bolo_props, wiring_map=wiring_map,
-                                            per_band = True, per_pixel = True,
-                                            per_wafer = True, per_squid = True,
+                                            per_band = average_per_band,
+                                            per_wafer = average_per_wafer,
+                                            per_squid = average_per_squid,
                                             include_keys = True)
-        wafers = np.unique([bolo_props[bolo].wafer_id for bolo in bolo_props.keys()])
-        wafers = wafers[wafers!='']
-        bands = np.unique([bolo_props[bolo].band/core.G3Units.GHz for bolo in bolo_props.keys()])
-        bands = bands[bands>0]
-        group_keys = ['{:.1f}_{}'.format(band, wafer) for band in bands for wafer in wafers]
 
         if units == 'temperature':
             # 1/rt(2) for uK rtHz to uK rtsec
@@ -178,18 +163,7 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring
         ts = frame[ts_key]
         psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
         n_pairs = {}
-        for pixel_id, bolonames in pixel_tgroups.items():
-            band, wafer, squid, pixel = pixel_id.split('_')
-
-            key_list = []
-            if average_per_band:
-                key_list.append(band)
-            if average_per_wafer:
-                key_list.append(wafer)
-            if average_per_squid:
-                key_list.append(squid)
-            group_key = '_'.join(key_list)
-            
+        for group_key, bolonames in pixel_tgroups.items():            
             for bolo in bolonames:
                 if bolo in frame[ts_key].keys():
                     f_pg = freqs
@@ -225,7 +199,10 @@ if args.calc_avg_current:
     pipe.Add(dfmux.ConvertTimestreamUnits, Input='RawTimestreams_I',
              Output='TimestreamsAmps', Units=core.G3TimestreamUnits.Current)
     pipe.Add(calc_avg_current, ts_key = 'TimestreamsAmps',
-             output_key='AvgCurrent')
+             output_key='AvgCurrent',
+             average_per_wafer=args.group_by_wafer,
+             average_per_band=args.group_by_band,
+             average_per_squid=args.group_by_squid)
     pipe.Add(core.Delete, keys=['TimestreamsAmps'])
     pipe.Add(core.Dump)
 
@@ -279,7 +256,11 @@ if args.diff_pairs:
         pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
                  min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
 
-pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units)
+pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units,
+         average_per_wafer=args.group_by_wafer,
+         average_per_band=args.group_by_band,
+         average_per_squid=args.group_by_squid)
+
 if args.fit_asd:
     if args.fit_readout_model:
         pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
