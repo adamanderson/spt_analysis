@@ -31,6 +31,9 @@ parser.add_argument('--poly-order', default=None, type=int,
 parser.add_argument('--fit-readout-model', action='store_true',
                     help='Fit ASDs to a noise model that consists of a white '
                     'noise floor with a 1/f component and no photon noise.')
+parser.add_argument('--calc-avg-current', action='store_true',
+                    help='Calculate the average current of each bolometer '
+                    'group and store it in the output frame.')
 args = parser.parse_args()
 
 
@@ -57,6 +60,57 @@ def noise_model(x, readout, A, alpha, photon, tau):
     return np.sqrt(readout + (A * (x)**(-1*alpha)) + photon / (1 + 2*np.pi*((x*tau)**2)))
 def full_readout_model(x, readout, A, alpha):
     return np.sqrt(readout + (A * (x)**(-1*alpha)))
+
+@core.scan_func_cache_data(bolo_props = 'BolometerProperties')
+def calc_avg_current(frame, ts_key='TimestreamAmps',
+                     output_key='AvgCurrent', bolo_props=None):
+    if frame.type == core.G3FrameType.Scan and \
+       ts_key in frame.keys() and bolo_props is not None:
+        pixel_tgroups = get_template_groups(bolo_props,
+                                            per_band = True,
+                                            per_wafer = True, include_keys = True)
+        wafers = np.unique([bolo_props[bolo].wafer_id for bolo in bolo_props.keys()])
+        wafers = wafers[wafers!='']
+        bands = np.unique([bolo_props[bolo].band/core.G3Units.GHz for bolo in bolo_props.keys()])
+        bands = bands[bands>0]
+        group_keys = ['{:.1f}_{}'.format(band, wafer) for band in bands for wafer in wafers]
+
+        units_factor = core.G3Units.amp
+
+        frame[output_key] = core.G3MapDouble()
+
+        ts = frame[ts_key]
+
+        for wafer in wafers:
+            for band in bands:
+                group_key = '{:.1f}_{}'.format(band, wafer)
+                n_bolos = 0
+
+                for bolo_id in pixel_tgroups:
+                    pixel_band = float(bolo_id.split('_')[0])
+                    pixel_wafer = bolo_id.split('_')[1]
+                    if pixel_band == band and pixel_wafer == wafer:
+                        if bolo_id in frame[ts_key].keys():
+                            ts_keys = [bolo_id]
+                        else:
+                            ts_keys = [bolo for bolo in pixel_tgroups[bolo_id] 
+                                       if bolo in frame[ts_key].keys()]
+
+                        for ts_id in ts_keys:
+                            current = np.median(ts[ts_id]) / units_factor
+
+                            # cut tods that are not finite or are zero
+                            if np.isfinite(current) & (current>0):
+                                if group_key not in frame[output_key].keys():
+                                    frame[output_key][group_key] = current
+                                else:
+                                    frame[output_key][group_key] += current
+                                n_bolos += 1
+
+                if n_bolos > 0:
+                    frame[output_key][group_key] /= float(n_bolos)
+
+
 
 def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
             min_freq=0, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01),
@@ -164,6 +218,14 @@ else:
 pipe = core.G3Pipeline()
 pipe.Add(core.G3Reader, filename=args.infiles)
 
+if args.calc_avg_current:
+    pipe.Add(dfmux.ConvertTimestreamUnits, Input='RawTimestreams_I',
+             Output='TimestreamsAmps', Units=core.G3TimestreamUnits.Current)
+    pipe.Add(calc_avg_current, ts_key = 'TimestreamsAmps',
+             output_key='AvgCurrent')
+    pipe.Add(core.Delete, keys=['TimestreamsAmps'])
+    pipe.Add(core.Dump)
+
 if args.poly_order:
     pipe.Add(mapmaker.TodFiltering,
              # filtering options
@@ -178,6 +240,7 @@ if args.units == 'current':
         pipe.Add(match_gains, ts_key = 'TimestreamsAmps', flag_key=None,
                  gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 0.1])
     ts_data_key = 'TimestreamsAmps'
+
 elif args.units == 'temperature':
     pipe.Add(std_processing.flagsegments.FieldFlaggingPreKcmbConversion,
              flag_key = 'Flags', ts_key = 'RawTimestreams_I')
@@ -217,7 +280,7 @@ pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.u
 if args.fit_asd:
     if args.fit_readout_model:
         pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
-                 min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+                 min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
     else:
         pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
                  min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
@@ -226,7 +289,6 @@ if args.fit_asd:
 pipe.Add(cleanup, to_save=['GainMatchCoeff',
                            'AverageASDSum', 'AverageASDSumFitParams',
                            'AverageASDDiff', 'AverageASDDiffFitParams',
-                           'AverageASD', 'AverageASDFitParams',
-                           ts_data_key])
+                           'AverageASD', 'AverageASDFitParams', 'AvgCurrent'])
 pipe.Add(core.G3Writer, filename=args.output)
 pipe.Run()
