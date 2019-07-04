@@ -16,6 +16,8 @@ parser.add_argument('-o', '--output', default='output.g3',
                     help='Name of output file.')
 parser.add_argument('--gain-match', action='store_true',
                     help='Calculate gain-matching coefficients.')
+parser.add_argument('--per-bolo-asd', action='store_true',
+                    help='Calculate and store ASDs for individual bolometers.')
 parser.add_argument('--sum-pairs', action='store_true',
                     help='Calculate the pair-summed ASD.')
 parser.add_argument('--diff-pairs', action='store_true',
@@ -136,6 +138,26 @@ def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
                 frame[params_key][group] = par
 
 
+def calc_asd(frame, ts_key, asd_key='ASD', units='temperature'):
+    if frame.type == core.G3FrameType.Scan and \
+       ts_key in frame.keys():
+        if units == 'temperature':
+            # 1/rt(2) for uK rtHz to uK rtsec
+            units_factor = (core.G3Units.microkelvin * np.sqrt(core.G3Units.sec) * np.sqrt(2.)) 
+        elif units == 'current':
+            # rt(2) because `dfmux.ConvertTimestreamUnits` converts to pA_RMS
+            # when using current units (see spt3g_software/calibration/python/noise_analysis.py)
+            # for more info on this annoying convention.
+            units_factor = (core.G3Units.amp*1e-12 / np.sqrt(core.G3Units.Hz)) / np.sqrt(2.)
+
+        frame[asd_key] = core.G3MapVectorDouble()
+        ts = frame[ts_key]
+        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
+        for bolo in psds.keys():
+            frame[asd_key][bolo] = np.sqrt(psds[bolo]) / units_factor
+        frame[asd_key]['frequency'] = freqs
+
+
 @core.scan_func_cache_data(bolo_props = 'BolometerProperties',
                            wiring_map = 'WiringMap')
 def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring_map=None,
@@ -247,7 +269,17 @@ elif args.units == 'temperature':
     ts_data_key = 'CalTimestreams'
 
 pipe.Add(core.Dump)
-                    
+
+if args.per_bolo_asd:
+    pipe.Add(calc_asd, ts_key = ts_data_key, asd_key='ASD', units=args.units)
+    if args.fit_asd:
+        if args.fit_readout_model:
+            pipe.Add(fit_asd, asd_key='ASD', params_key='ASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+        else:
+            pipe.Add(fit_asd, asd_key='ASD', params_key='ASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
+
 if args.sum_pairs:
     pipe.Add(sum_pairs, ts_key = ts_data_key,
              gain_match_key = 'GainMatchCoeff',
@@ -296,6 +328,7 @@ if args.average_asd:
 pipe.Add(cleanup, to_save=['GainMatchCoeff',
                            'AverageASDSum', 'AverageASDSumFitParams',
                            'AverageASDDiff', 'AverageASDDiffFitParams',
-                           'AverageASD', 'AverageASDFitParams', 'AvgCurrent'])
+                           'AverageASD', 'AverageASDFitParams', 'AvgCurrent',
+                           'ASD', 'ASDFitParams'])
 pipe.Add(core.G3Writer, filename=args.output)
-pipe.Run()
+pipe.Run(profile=True)

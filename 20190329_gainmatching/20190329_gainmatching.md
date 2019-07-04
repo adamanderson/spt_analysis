@@ -696,6 +696,16 @@ fr = list(core.G3File('gainmatching_ra0hdec-67.25_76707699.g3'))
 print(fr[20])
 ```
 
+## scratch work
+
+```python
+fr_test = list(core.G3File('test.g3'))[1]
+```
+
+```python
+print(fr_test)
+```
+
 ```python
 
 ```
