@@ -18,6 +18,8 @@ def cleanup(frame, to_save=[]):
         return frame
     elif frame.type == core.G3FrameType.Calibration:
         return frame
+    elif frame.type == core.G3FrameType.Wiring:
+        return frame
     else:
         return []
 
@@ -32,7 +34,7 @@ pipe.Add(core.G3Reader, filename=args.infiles)
 pipe.Add(dfmux.unittransforms.ConvertTimestreamUnits,
          Input='RawTimestreams_I', Output='TimestreamsWatts')
 pipe.Add(calc_tod_median)
-pipe.Add(cleanup, to_save='AvgPower')
+pipe.Add(cleanup, to_save=['AvgPower', 'DfMuxHousekeeping'])
 pipe.Add(core.G3Writer, filename=args.output)
 
 pipe.Run(profile=True)
