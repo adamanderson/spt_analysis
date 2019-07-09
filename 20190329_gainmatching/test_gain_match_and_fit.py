@@ -16,6 +16,8 @@ parser.add_argument('-o', '--output', default='output.g3',
                     help='Name of output file.')
 parser.add_argument('--gain-match', action='store_true',
                     help='Calculate gain-matching coefficients.')
+parser.add_argument('--per-bolo-asd', action='store_true',
+                    help='Calculate and store ASDs for individual bolometers.')
 parser.add_argument('--sum-pairs', action='store_true',
                     help='Calculate the pair-summed ASD.')
 parser.add_argument('--diff-pairs', action='store_true',
@@ -136,6 +138,26 @@ def fit_asd(frame, asd_key='InputPSD', params_key='PSDFitParams',
                 frame[params_key][group] = par
 
 
+def calc_asd(frame, ts_key, asd_key='ASD', units='temperature'):
+    if frame.type == core.G3FrameType.Scan and \
+       ts_key in frame.keys():
+        if units == 'temperature':
+            # 1/rt(2) for uK rtHz to uK rtsec
+            units_factor = (core.G3Units.microkelvin * np.sqrt(core.G3Units.sec) * np.sqrt(2.)) 
+        elif units == 'current':
+            # rt(2) because `dfmux.ConvertTimestreamUnits` converts to pA_RMS
+            # when using current units (see spt3g_software/calibration/python/noise_analysis.py)
+            # for more info on this annoying convention.
+            units_factor = (core.G3Units.amp*1e-12 / np.sqrt(core.G3Units.Hz)) / np.sqrt(2.)
+
+        frame[asd_key] = core.G3MapVectorDouble()
+        ts = frame[ts_key]
+        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
+        for bolo in psds.keys():
+            frame[asd_key][bolo] = np.sqrt(psds[bolo]) / units_factor
+        frame[asd_key]['frequency'] = freqs
+
+
 @core.scan_func_cache_data(bolo_props = 'BolometerProperties',
                            wiring_map = 'WiringMap')
 def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring_map=None,
@@ -143,11 +165,14 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring
                 average_per_wafer=True, average_per_band=True, average_per_squid=False):
     if frame.type == core.G3FrameType.Scan and \
        ts_key in frame.keys() and bolo_props is not None:
-        pixel_tgroups = get_template_groups(bolo_props, wiring_map=wiring_map,
+        bolo_tgroups = get_template_groups(bolo_props, wiring_map=wiring_map,
                                             per_band = average_per_band,
                                             per_wafer = average_per_wafer,
                                             per_squid = average_per_squid,
                                             include_keys = True)
+        pixel_tgroups = get_template_groups(bolo_props, per_band = True,
+                                            per_pixel = True, per_wafer = True,
+                                            include_keys=True)
 
         if units == 'temperature':
             # 1/rt(2) for uK rtHz to uK rtsec
@@ -163,11 +188,20 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring
         ts = frame[ts_key]
         psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
         n_pairs = {}
-        for group_key, bolonames in pixel_tgroups.items():            
+        for group_key, bolonames in bolo_tgroups.items():            
             for bolo in bolonames:
+                # pair-sum/diff are keyed by pixel name, while timestreams are
+                # keyed by bolo name; need to handle both possibilities here.
+                pixel_name = [k for k in pixel_tgroups.keys() if bolo in pixel_tgroups[k]][0]
+                psd_key = None
                 if bolo in frame[ts_key].keys():
+                    psd_key = bolo
+                elif pixel_name in frame[ts_key].keys():
+                    psd_key = pixel_name
+
+                if psd_key is not None:
                     f_pg = freqs
-                    psd_pg = psds[bolo]
+                    psd_pg = psds[psd_key]
                     asd_pg = np.sqrt(psd_pg) / units_factor
                     
                     # cut psds that are not finite or are zero
@@ -233,7 +267,19 @@ elif args.units == 'temperature':
         pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
                  gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 1.0])
     ts_data_key = 'CalTimestreams'
-                    
+
+pipe.Add(core.Dump)
+
+if args.per_bolo_asd:
+    pipe.Add(calc_asd, ts_key = ts_data_key, asd_key='ASD', units=args.units)
+    if args.fit_asd:
+        if args.fit_readout_model:
+            pipe.Add(fit_asd, asd_key='ASD', params_key='ASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+        else:
+            pipe.Add(fit_asd, asd_key='ASD', params_key='ASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
+
 if args.sum_pairs:
     pipe.Add(sum_pairs, ts_key = ts_data_key,
              gain_match_key = 'GainMatchCoeff',
@@ -242,8 +288,12 @@ if args.sum_pairs:
         pipe.Add(average_asd, ts_key='PairSumTimestreams', avg_psd_key='AverageASDSum', units=args.units)
         pipe.Add(core.Delete, keys='PairSumTimestreams')
     if args.fit_asd:
-        pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
-                 min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01))
+        if args.fit_readout_model:
+            pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+        else:
+            pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01))
 
 if args.diff_pairs:
     pipe.Add(difference_pairs, ts_key = ts_data_key,
@@ -253,26 +303,32 @@ if args.diff_pairs:
         pipe.Add(average_asd, ts_key='PairDiffTimestreams', avg_psd_key='AverageASDDiff', units=args.units)
         pipe.Add(core.Delete, keys='PairDiffTimestreams')
     if args.fit_asd:
-        pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
-                 min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
+        if args.fit_readout_model:
+            pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+        else:
+            pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
 
-pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units,
-         average_per_wafer=args.group_by_wafer,
-         average_per_band=args.group_by_band,
-         average_per_squid=args.group_by_squid)
+if args.average_asd:
+    pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units,
+             average_per_wafer=args.group_by_wafer,
+             average_per_band=args.group_by_band,
+             average_per_squid=args.group_by_squid)
 
-if args.fit_asd:
-    if args.fit_readout_model:
-        pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
-                 min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
-    else:
-        pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
-                 min_freq=0.01, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
+    if args.fit_asd:
+        if args.fit_readout_model:
+            pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1), readout_model=True)
+        else:
+            pipe.Add(fit_asd, asd_key='AverageASD', params_key='AverageASDFitParams',
+                     min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
         
 
 pipe.Add(cleanup, to_save=['GainMatchCoeff',
                            'AverageASDSum', 'AverageASDSumFitParams',
                            'AverageASDDiff', 'AverageASDDiffFitParams',
-                           'AverageASD', 'AverageASDFitParams', 'AvgCurrent'])
+                           'AverageASD', 'AverageASDFitParams', 'AvgCurrent',
+                           'ASD', 'ASDFitParams'])
 pipe.Add(core.G3Writer, filename=args.output)
-pipe.Run()
+pipe.Run(profile=True)

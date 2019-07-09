@@ -232,7 +232,8 @@ plt.loglog(f, noise_model(f,*testpar), 'k--', label='total')
 ## Fitting pair-summed vs. pair-differenced ASDs
 
 ```python
-fr = list(core.G3File('gain_match_fit_test_73798315.g3'))[1]
+fr = list(core.G3File('gainmatching_noise_73124800.g3'))[1]
+print(fr)
 ```
 
 ```python
@@ -389,6 +390,7 @@ plt.savefig('figures_grid/gain_matching_coeffs_73124800.png', dpi=150)
 ```python
 fr = list(core.G3File('horizon_noise_77863968.g3'))[1]
 fr_poly1 = list(core.G3File('horizon_noise_77863968_poly1.g3'))[1]
+print(fr)
 ```
 
 ```python
@@ -419,7 +421,7 @@ for jband, band in enumerate([90., 150., 220.]):
 
         par = fr_poly1["AverageASDFitParams"][group]
 #         ax[jwafer].loglog(ff, asd, label='all bolos (poly 0)')
-        ax[jwafer].loglog(ff_poly1, asd_poly1, label='all bolos (poly 1)')
+        ax[jwafer].loglog(ff, asd, label='all bolos (poly 1)')
         ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / \sqrt{2}')
         try:
             ax[jwafer].loglog(ff, horizon_model(ff, *list(par)), 'k--')
@@ -518,53 +520,7 @@ plt.tight_layout()
 
 ```
 
-## Are we scanning fast enough?
-
-
-Let's adopt a very crude model of the atmosphere, in which the atmosphere consists of blobs at characteristic angular scale $\Delta \theta$, which move at an angular velocity $\vec{\omega}_{a}$. Assume further that the telescope is scanning at an angular velocity $\vec{\omega}_{s}$. The relative velocity of the blobs of atmosphere across the focal plane is therefore $\vec{\omega} = \vec{\omega}_{s} + \vec{\omega}_{a}$. The square norm of the angular velocity is therefore
-$$
-\left| \vec{\omega} \right|^2 = \left| \vec{\omega}_{s} \right|^2 + \left| \vec{\omega}_{a} \right|^2 + 2\left| \vec{\omega}_{s} \right| \left| \vec{\omega}_{a} \right| \cos \alpha.
-$$
-Next assume that the angle between the scan direction and the atmosphere velocity is uniformly distributed over many observations. This assumption should actually be very good since the atmosphere is usually moving in the same direction while our scan direction moves in a circle. The time-average of the square velocity is therefore just:
-$$
-\left| \vec{\omega} \right|^2 = \left| \vec{\omega}_{s} \right|^2 + \left| \vec{\omega}_{a} \right|^2.
-$$
-A blob of atmosphere of size $\Delta \theta$ appears at a characteristic frequency squared of 
-$$
-f^2(\omega_s, \omega_a) = \frac{\omega_s^2 + \omega_a^2}{\Delta \theta^2}.
-$$
-
-Assuming that the 1/f knee frequency corresponds roughly to the angular scale of blobs of atmosphere on the sky, from our field scans and our noise stares, we have measurements of $f(\omega_s=0, \omega_a)$ and $f(\omega_s\simeq1\textrm{deg/s}, \omega_a)$. We cannot estimate the $1/\ell$ knee from just these data, but we can estimate how close we are to our best achievable $1/\ell$ knee. By definition, the best possible $1/\ell$ knee occurs when we take $\omega_a = 0$ (i.e. atmosphere is comoving with the telescope scan), so define the figure of merit ratio:
-$$
-r = \frac{f^2(\omega_s, \omega_a)}{f^2(\omega_s, \omega_a=0)} = 1 + \frac{\omega_a^2}{\omega_s^2}
-$$
-When $r=1$, our 1/f knee is what it would be in the absence of atmospheric fluctuations, and $r>1$ corresponds to a situation that could be improved by scanning faster. Note that $r$ is not just a ratio of 1/f knees, it is also the ratio of $1/\ell$ knees, since the scan speed divides out in the ratio. We measure the numerator, but not the denominator, of $r$ in field scans. In noise stares, we also measure $f(\omega_s=0, \omega_a)$. With some algebra, we can solve for $r$. Define
-$$
-s = \frac{f^2(\omega_s, \omega_a)}{f^2(\omega_s=0, \omega_a)} = \frac{\omega_s^2 + \omega_a^2}{\omega_a^2} = 1 + \frac{\omega_s^2}{\omega_a^2}.
-$$
-So
-$$
-\frac{\omega_a^2}{\omega_s^2} = \frac{1}{s - 1},
-$$
-and
-$$
-r = 1 + \frac{1}{s-1} = \frac{s}{s-1}.
-$$
-I emphasize again that $s$ is a quantity that we measure: it is the 1/f knee of field scans divided by the 1/f knee of noise stares. The intuition here is also clear: if our 1/f knee in field scans is *way* higher than noise stares, then $s$ is large and atmosphere is changing much more slowly than we are scanning. That makes $r$ close to 1, so we have little room to improve by scanning yet faster.
-
-
-## 1/f in Field Scans
-
-```python
-fr = list(core.G3File('gainmatching_ra0hdec-67.25_76707699.g3'))
-
-```
-
-```python
-print(fr[20])
-```
-
-## Noise-to-carrier ratio
+### Noise-to-carrier ratio
 
 ```python
 # plots for split by squid
@@ -646,79 +602,108 @@ plt.tight_layout()
 plt.savefig('figures_grid/NCR_squidband_split.png', dpi=200)
 ```
 
-## scratch work
+### readout noise plots for Amy's LTD proceedings
 
 ```python
-jplot = 0
-fr = d[1]
-freq = fr["AverageASD"]['frequency'] / core.G3Units.Hz
-for group, psd in fr["AverageASD"].items():
-    plt.figure(jplot)
-    plt.loglog(freq, psd)
-    par = fr["AverageASDFitParams"][group]
-    plt.loglog(ff, horizon_model(ff, *list(par)), 'k--')
-    plt.title(group)
-    plt.savefig('figures_grid/group_psd/{}.png'.format(group), dpi=120)
-    plt.close()
+fr = list(core.G3File('horizon_noise_77863968_bender_ltd.g3'))[1]
+```
+
+```python
+print(fr)
 ```
 
 ```python
 band_numbers = {90.: 1, 150.: 2, 220.: 3}
 subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+band_labels = {90:'95', 150:'150', 220:'220'}
 
+fig, ax = plt.subplots(1, 3, sharex=True, sharey=True, figsize=(12,4))
+fig.subplots_adjust(wspace=0)
 for jband, band in enumerate([90., 150., 220.]):
-    fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
-    ax = ax.flatten()
-    for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
-                                    'w181', 'w188', 'w203', 'w204', 'w206']):
-        group = '{:.1f}_{}'.format(band, wafer)
-        
-#         plt.subplot(2, 5, subplot_numbers[band])
-        ff = np.array(fr['AverageASD']['frequency']/core.G3Units.Hz)
-        ff_poly1 = np.array(fr_poly1['AverageASD']['frequency']/core.G3Units.Hz)
-        asd = np.array(fr['AverageASD'][group])
-        asd_poly1 = np.array(fr_poly1['AverageASD'][group])
-
-        par = fr_poly1["AverageASDFitParams"][group]
-#         ax[jwafer].loglog(ff, asd, label='all bolos (poly 0)')
-        ax[jwafer].loglog(ff_poly1, asd_poly1, label='all bolos (poly 1)')
-        try:
-            ax[jwafer].loglog(ff, horizon_model(ff, *list(par)), 'k--')
-        except:
-            pass
-
-        ax[jwafer].set_title('{}, {} GHz, white noise = {:.1f} pA$ / \sqrt{{Hz}}$'.format(group.split('_')[1],
-                                                                       int(float(group.split('_')[0])),
-                                                                       np.mean(asd[(ff>10) & (ff<15)])))
-        try:
-            f_knee = bisect(horizon_knee_func, a=0.001, b=1.0, args=tuple(par))
-            ax[jwafer].set_title('{}, {} GHz\nwhite noise = {:.1f} '
-                                 'pA$ / \sqrt{{Hz}}$ '
-                                 '$f_{{knee}}^{{all}}$ = {:.3f}'.format(group.split('_')[1],
-                                                             int(float(group.split('_')[0])),
-                                                             np.mean(asd[(ff>10) & (ff<15)]),
-                                                                         f_knee))
-        except:
-            ax[jwafer].set_title('{}, {} GHz\nwhite noise = {:.1f} '
-                                 'pA$ / \sqrt{{Hz}}$'.format(group.split('_')[1],
-                                                             int(float(group.split('_')[0])),
-                                                             np.mean(asd[(ff>10) & (ff<15)])))
-            
-    for jwafer in [5,6,7,8,9]:
-        ax[jwafer].set_xlabel('frequency [Hz]')
     
-    ax[0].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
-    ax[5].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
-    plt.ylim([1,1000])
-    plt.legend()
-    plt.tight_layout()
-        
-    subplot_numbers[band] +=1
-        
+    group = '{:.1f}_w180'.format(band)
+
+    ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+    ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
+    asd_diff = np.array(fr['AverageASDDiff'][group]) / np.sqrt(2.)
+    asd_sum = np.array(fr['AverageASDSum'][group]) / np.sqrt(2.)
+
+    par = fr["AverageASDDiffFitParams"][group]
+    ax[jband].loglog(ff_sum[ff_sum<75], asd_sum[ff_sum<75],
+                     label='pair sum (measured)', color='0.6')
+    ax[jband].loglog(ff_diff[ff_diff<75], asd_diff[ff_diff<75],
+                     label='pair difference (measured)', color='k')
+    ax[jband].loglog(ff_sum, atm_noise(ff_sum, par[1], par[2]) / np.sqrt(2.),
+                     'C0--', label='low-frequency noise')
+    ax[jband].loglog(ff_sum, readout_noise(ff_sum, par[0]) / np.sqrt(2.),
+                     'C2--', label='white noise')
+    ax[jband].loglog(ff_sum, horizon_model(ff_sum, *list(par)) / np.sqrt(2.),
+                     'C3--', label='total noise model')
+
+    ax[jband].set_title('{} GHz'.format(band_labels[band]))
+    ax[jband].set_xlabel('frequency [Hz]')
+    ax[jband].grid()
+ax[0].set_ylabel('current noise [pA/$\sqrt{Hz}$]')
+
+plt.ylim([5,1000])
+plt.legend()
+plt.tight_layout()
+plt.savefig('w180_horizon_noise_ltd.pdf')
+```
+
+## Are we scanning fast enough?
+
+
+Let's adopt a very crude model of the atmosphere, in which the atmosphere consists of blobs at characteristic angular scale $\Delta \theta$, which move at an angular velocity $\vec{\omega}_{a}$. Assume further that the telescope is scanning at an angular velocity $\vec{\omega}_{s}$. The relative velocity of the blobs of atmosphere across the focal plane is therefore $\vec{\omega} = \vec{\omega}_{s} + \vec{\omega}_{a}$. The square norm of the angular velocity is therefore
+$$
+\left| \vec{\omega} \right|^2 = \left| \vec{\omega}_{s} \right|^2 + \left| \vec{\omega}_{a} \right|^2 + 2\left| \vec{\omega}_{s} \right| \left| \vec{\omega}_{a} \right| \cos \alpha.
+$$
+Next assume that the angle between the scan direction and the atmosphere velocity is uniformly distributed over many observations. This assumption should actually be very good since the atmosphere is usually moving in the same direction while our scan direction moves in a circle. The time-average of the square velocity is therefore just:
+$$
+\left| \vec{\omega} \right|^2 = \left| \vec{\omega}_{s} \right|^2 + \left| \vec{\omega}_{a} \right|^2.
+$$
+A blob of atmosphere of size $\Delta \theta$ appears at a characteristic frequency squared of 
+$$
+f^2(\omega_s, \omega_a) = \frac{\omega_s^2 + \omega_a^2}{\Delta \theta^2}.
+$$
+
+Assuming that the 1/f knee frequency corresponds roughly to the angular scale of blobs of atmosphere on the sky, from our field scans and our noise stares, we have measurements of $f(\omega_s=0, \omega_a)$ and $f(\omega_s\simeq1\textrm{deg/s}, \omega_a)$. We cannot estimate the $1/\ell$ knee from just these data, but we can estimate how close we are to our best achievable $1/\ell$ knee. By definition, the best possible $1/\ell$ knee occurs when we take $\omega_a = 0$ (i.e. atmosphere is comoving with the telescope scan), so define the figure of merit ratio:
+$$
+r = \frac{f^2(\omega_s, \omega_a)}{f^2(\omega_s, \omega_a=0)} = 1 + \frac{\omega_a^2}{\omega_s^2}
+$$
+When $r=1$, our 1/f knee is what it would be in the absence of atmospheric fluctuations, and $r>1$ corresponds to a situation that could be improved by scanning faster. Note that $r$ is not just a ratio of 1/f knees, it is also the ratio of $1/\ell$ knees, since the scan speed divides out in the ratio. We measure the numerator, but not the denominator, of $r$ in field scans. In noise stares, we also measure $f(\omega_s=0, \omega_a)$. With some algebra, we can solve for $r$. Define
+$$
+s = \frac{f^2(\omega_s, \omega_a)}{f^2(\omega_s=0, \omega_a)} = \frac{\omega_s^2 + \omega_a^2}{\omega_a^2} = 1 + \frac{\omega_s^2}{\omega_a^2}.
+$$
+So
+$$
+\frac{\omega_a^2}{\omega_s^2} = \frac{1}{s - 1},
+$$
+and
+$$
+r = 1 + \frac{1}{s-1} = \frac{s}{s-1}.
+$$
+I emphasize again that $s$ is a quantity that we measure: it is the 1/f knee of field scans divided by the 1/f knee of noise stares. The intuition here is also clear: if our 1/f knee in field scans is *way* higher than noise stares, then $s$ is large and atmosphere is changing much more slowly than we are scanning. That makes $r$ close to 1, so we have little room to improve by scanning yet faster.
+
+
+## 1/f in Field Scans
+
+```python
+fr = list(core.G3File('gainmatching_ra0hdec-67.25_76707699.g3'))
 ```
 
 ```python
-d[1]["AvgCurrent"].keys()
+print(fr[20])
+```
+
+## scratch work
+
+```python
+fr_test = list(core.G3File('test.g3'))[1]
+```
+
+```python
+print(fr_test)
 ```
 
 ```python
