@@ -1,6 +1,5 @@
 import numpy as np 
 import pickle
-import analyze_IV
 import os.path
 from scipy.optimize import curve_fit
 from scipy.integrate import quad
