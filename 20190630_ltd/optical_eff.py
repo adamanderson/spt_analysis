@@ -3,6 +3,7 @@ import pickle
 import os.path
 from scipy.optimize import curve_fit
 from scipy.integrate import quad
+from pydfmux.analysis import analyze_IV
 
 # physical constants
 hPlanck = 6.626e-34 # [J s]
@@ -125,7 +126,7 @@ def PsatofT_coldload(T, Psat_electrical, bias_freq, dark_slope, optical_eff,
         P_optical[jT] = P_optical[jT] * optical_eff
 
     Psat = Psat_electrical + dark_slope * T - \
-        P_optical/1.e12 * ( Rb**2 / (Rb**2 + (2*np.pi*bias_freq*Lb)**2) )
+        P_optical/1.e12 * np.sqrt( Rb**2 / (Rb**2 + (2*np.pi*bias_freq*Lb)**2) )
     return Psat
 
 
