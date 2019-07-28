@@ -304,3 +304,36 @@ plt.title('difference between nominal offsets and new 2019 offsets')
 ```python
 dd_bolos[(np.abs(ddr)>0.008)]
 ```
+
+## Follow-up on question from NDH
+Nicholas Huang raised the question of why there are about 1000 detectors in the elnod observation `/spt/user/production/calibration/elnod/71084755.g3`, which are not present in the bolometer properties `/spt/user/production/calibration/boloproperties/60000000.g3`. Let's try to understand why this is occurring.
+
+```python
+boloprops = list(core.G3File('/spt/user/production/calibration/boloproperties/60000000.g3'))\
+                [0]["BolometerProperties"]
+# recent elnod: 81046089
+# problematic elnod: 71084755
+elnod = list(core.G3File('/spt/user/production/calibration/elnod/81046089.g3'))\
+                [0]["ElnodSlopes"]
+```
+
+```python
+bolos_in_elnod_not_bps = []
+bolos_bps = list(boloprops.keys())
+bolos_elnod = list(elnod.keys())
+for bolo in bolos_elnod:
+    if bolo not in bolos_bps:
+        bolos_in_elnod_not_bps.append(bolo)
+```
+
+```python
+bolos_in_elnod_not_bps
+```
+
+```python
+/spt/user/production/calibration/elnod/81046089.g3
+```
+
+```python
+
+```
