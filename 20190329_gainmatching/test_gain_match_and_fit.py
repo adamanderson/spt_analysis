@@ -5,7 +5,7 @@ from spt3g.todfilter import dftutils
 import os.path
 import operator
 from scipy.optimize import curve_fit
-from scipy.signal import welch, periodogram
+from scipy.signal import welch, periodogram, windows
 import numpy as np
 import argparse
 
@@ -150,11 +150,18 @@ def calc_asd(frame, ts_key, asd_key='ASD', units='temperature'):
             # for more info on this annoying convention.
             units_factor = (core.G3Units.amp*1e-12 / np.sqrt(core.G3Units.Hz)) / np.sqrt(2.)
 
+        asd_integral_key = asd_key + '_integral'
+        frame[asd_integral_key] = core.G3MapDouble()
+
         frame[asd_key] = core.G3MapVectorDouble()
         ts = frame[ts_key]
-        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
+        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False, window_function=windows.boxcar)
         for bolo in psds.keys():
             frame[asd_key][bolo] = np.sqrt(psds[bolo]) / units_factor
+
+        for bolo in psds.keys():
+            frame[asd_integral_key][bolo] = np.sum(np.array(psds[bolo])[(freqs>0.01) & (freqs<0.5)])
+
         frame[asd_key]['frequency'] = freqs
 
 
@@ -186,7 +193,7 @@ def average_asd(frame, ts_key, avg_psd_key='AverageASD', bolo_props=None, wiring
         frame[avg_psd_key] = core.G3MapVectorDouble()
 
         ts = frame[ts_key]
-        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False)
+        psds, freqs = dftutils.get_psd_of_ts_map(ts, pad=False, window_function=windows.boxcar)
         n_pairs = {}
         for group_key, bolonames in bolo_tgroups.items():            
             for bolo in bolonames:
@@ -265,7 +272,10 @@ elif args.units == 'temperature':
              flag_key = 'Flags', ts_key = 'CalTimestreams')
     if args.gain_match:
         pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
-                 gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 1.0])
+                 gain_match_key = 'GainMatchCoeff', freq_range=[0.01, 0.1])
+    else:
+        pipe.Add(match_gains, ts_key = 'CalTimestreams', flag_key='Flags',
+                 gain_match_key = 'GainMatchCoeff', manual_gain_factor=(1.0, 1.0))
     ts_data_key = 'CalTimestreams'
 
 pipe.Add(core.Dump)

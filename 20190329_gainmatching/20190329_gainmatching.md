@@ -272,13 +272,20 @@ for jband, band in enumerate([90., 150., 220.]):
 
         par_diff = fr["AverageASDDiffFitParams"][group]
         par_sum = fr["AverageASDSumFitParams"][group]
-        ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
-        ax[jwafer].loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
-        ax[jwafer].loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
-        ax[jwafer].loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+#         ax[jwafer].loglog(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
+#         ax[jwafer].loglog(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
+#         ax[jwafer].loglog(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
+#         ax[jwafer].loglog(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
 #         ax[jwafer].loglog(ff_sum, readout_noise(ff_sum, par_sum[0]), 'k--')
 #         ax[jwafer].loglog(ff_sum, atm_noise(ff_sum, par_sum[1], par_sum[2]), 'k--')
 #         ax[jwafer].loglog(ff_sum, photon_noise(ff_sum, par_sum[3], par_sum[4]), 'k--')
+        ax[jwafer].plot(ff_diff, asd_diff, label='(x - y) / $\sqrt{2}$')
+        ax[jwafer].plot(ff_sum, asd_sum, label='(x + y) / $\sqrt{2}$')
+        ax[jwafer].plot(ff_diff, noise_model(ff_diff, *list(par_diff)), 'k--')
+        ax[jwafer].plot(ff_sum, noise_model(ff_sum, *list(par_sum)), 'k--')
+        ax[jwafer].plot(ff_sum, readout_noise(ff_sum, par_sum[0]), 'k--')
+        ax[jwafer].plot(ff_sum, atm_noise(ff_sum, par_sum[1], par_sum[2]), 'k--')
+        ax[jwafer].plot(ff_sum, photon_noise(ff_sum, par_sum[3], par_sum[4]), 'k--')
         
         try:
             f_knee = bisect(knee_func, a=0.01, b=1.0, args=tuple(par_diff))
@@ -295,7 +302,8 @@ for jband, band in enumerate([90., 150., 220.]):
     
     ax[0].set_ylabel('NET [uK$\sqrt{s}$]')
     ax[5].set_ylabel('NET [uK$\sqrt{s}$]')
-    plt.ylim([2e2,1e5])
+    #plt.ylim([2e2,1e5])
+    plt.ylim([0,1500])
     plt.legend()
     plt.tight_layout()
         
