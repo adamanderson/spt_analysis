@@ -22,6 +22,9 @@ parser.add_argument('--sum-pairs', action='store_true',
                     help='Calculate the pair-summed ASD.')
 parser.add_argument('--diff-pairs', action='store_true',
                     help='Calculate the pair-differenced ASD.')
+parser.add_argument('--per-pair-asd', action='store_true',
+                    help='If pair sum or difference timestreams are calculated, '
+                    'then also calculate the ASD.')
 parser.add_argument('--average-asd', action='store_true',
                     help='Calculate averaged ASD.')
 parser.add_argument('--fit-asd', action='store_true',
@@ -43,6 +46,10 @@ parser.add_argument('--group-by-band', action='store_true',
 parser.add_argument('--group-by-squid', action='store_true',
                     help='When computing PSD averages, group by squid.')
 args = parser.parse_args()
+
+if not args.sum_pairs and not args.diff_pairs and args.per_pair_asd:
+    parser.error('--per-pair-asd can only be used if --sum-pairs or '
+                 '--diff-pairs is selected.')
 
 
 def cleanup(frame, to_save=[]):
@@ -304,6 +311,8 @@ if args.sum_pairs:
         else:
             pipe.Add(fit_asd, asd_key='AverageASDSum', params_key='AverageASDSumFitParams',
                      min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 2, 400**2, 0.01))
+    if args.per_pair_asd:
+        pipe.Add(calc_asd, ts_key = ts_data_key, asd_key='ASDSum', units=args.units)
 
 if args.diff_pairs:
     pipe.Add(difference_pairs, ts_key = ts_data_key,
@@ -319,6 +328,8 @@ if args.diff_pairs:
         else:
             pipe.Add(fit_asd, asd_key='AverageASDDiff', params_key='AverageASDDiffFitParams',
                      min_freq=0.001, max_freq=60, params0=(200**2, 10**2, 1, 400**2, 0.01))
+    if args.per_pair_asd:
+        pipe.Add(calc_asd, ts_key = ts_data_key, asd_key='ASDDiff', units=args.units)
 
 if args.average_asd:
     pipe.Add(average_asd, ts_key=ts_data_key, avg_psd_key='AverageASD', units=args.units,

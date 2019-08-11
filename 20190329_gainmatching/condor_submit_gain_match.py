@@ -25,16 +25,36 @@ df_obslist = pd.read_csv(args.obslist, sep='\t')
 obsids = np.array(df_obslist['obsid'], dtype=str)
 sources = np.array(df_obslist['source'], dtype=str)
 
-condor_dir = '/scratch/adama/condor_logs/20190329_gainmatching/'
+# dir_label = '20190809_noise_gainmatch_cal'
+# args_optional = ['--average-asd', '--fit-asd', '--units', 'temperature', '--poly-order 1',
+#                  '--diff-pairs', '--sum-pairs', '--group-by-band', '--group-by-wafer',
+#                  '--gain-match']
+# dir_label = '20190809_noise_gainmatch_cal'
+# args_optional = ['--average-asd', '--fit-asd', '--units', 'temperature', '--poly-order 1',
+#                  '--diff-pairs', '--sum-pairs', '--group-by-band', '--group-by-wafer',
+#                  '--gain-match', '--per-pair-asd']
+# dir_label = '20190809_noise_rcw38_cal'
+# args_optional = ['--average-asd', '--fit-asd', '--units', 'temperature', '--poly-order 1',
+#                  '--diff-pairs', '--sum-pairs', '--group-by-band', '--group-by-wafer']
+# dir_label = '20190809_noise_rcw38_cal'
+# args_optional = ['--average-asd', '--fit-asd', '--units', 'temperature', '--poly-order 1',
+#                  '--diff-pairs', '--sum-pairs', '--group-by-band', '--group-by-wafer', '--per-pair-asd']
+dir_label = '20190811_field_gainmatch_test'
+args_optional = ['--average-asd', '--fit-asd', '--units', 'temperature', '--poly-order 1',
+                 '--diff-pairs', '--sum-pairs', '--group-by-band', '--group-by-wafer',
+                 '--gain-match']
+
+condor_dir = '/scratch/adama/condor_logs/{}/'.format(dir_label)
 cal_dir = '/spt/user/production/calibration/calframe/'
 if args.fullrate:
-    out_root = '/spt/user/adama/20190329_gainmatching/fullrate/'
+    out_root = '/spt/user/adama/{}/fullrate/'.format(dir_label)
+    bolodata_path = '/spt/data/bolodata/fullrate/'
 else:
-    out_root = '/spt/user/adama/20190329_gainmatching/downsampled/'
+    out_root = '/spt/user/adama/{}/downsampled/'.format(dir_label)
+    bolodata_path = '/spt/data/bolodata/downsampled/'
 job_root = 'gainmatching'
 script = '/home/adama/SPT/spt_analysis/20190329_gainmatching/test_gain_match_and_fit.py'
 
-bolodata_path = '/spt/data/bolodata/fullrate/'
 
 test = True
 if args.submit:
@@ -51,12 +71,13 @@ for source, obsid in zip(sources, obsids):
 
     if all(os.path.exists(fn) for fn in infiles):
         args_in = [os.path.basename(dat) for dat in infiles]
-        args = '{infiles} -o {outfile}' \
-              .format(infiles = ' '.join(args_in), 
-                      outfile = job_name+'.g3',
-                      source = source)
+        args_script = '{infiles} -o {outfile}' \
+            .format(infiles = ' '.join(args_in), 
+                    outfile = job_name+'.g3',
+                    source = source)
+        args_script = ' '.join([args_script] + args_optional)
 
-        cluster, f_submit, f_script = condor_submit(script, create_only=test, args = [args],
+        cluster, f_submit, f_script = condor_submit(script, create_only=test, args = [args_script],
                                                     log_root = condor_dir, 
                                                     output_root = out_root,
                                                     jobname = job_name,
