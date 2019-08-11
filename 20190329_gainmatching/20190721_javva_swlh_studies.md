@@ -19,6 +19,8 @@ Our Berkeley collaborators have been asking me some questions. This note is my a
 from spt3g import core, dfmux, calibration
 import numpy as np
 import matplotlib.pyplot as plt
+from glob import glob
+import os.path
 ```
 
 ## Updating the gain-matching
@@ -208,6 +210,140 @@ plt.legend()
 plt.xlabel('gain-matching coefficient')
 plt.tight_layout()
 plt.savefig('gain_match_coeff.png', dpi=120)
+```
+
+## Grid processing
+There are some questions raised about why the 90 GHz looks so different, and could this be an unusually good weather day so that the gain-matching is not actually being computed efficiently. I processed a bunch of noise stares on the grid. Let's check them all to see how well the noise power is actually subtracted in the lowest bin for a more uniform sample of noise stares.
+
+```python
+fnames_gainmatch = glob('/spt/user/adama/20190809_noise_gainmatch_cal/downsampled/*g3')
+fnames_rcw38 = glob('/spt/user/adama/20190809_noise_rcw38_cal/downsampled/*g3')
+```
+
+```python
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+
+for fn_rcw38 in fnames_rcw38:
+    filename = os.path.basename(fn_rcw38)
+    print(filename)
+    fn_gainmatch = np.unique([fn for fn in fnames_gainmatch if filename in fn])
+    
+    if len(fn_gainmatch) != 0:
+        fr_rcw38 = list(core.G3File(fn_rcw38))[1]
+        fr_nuclear = list(core.G3File(fn_gainmatch))[1]
+        obsid = os.path.splitext(os.path.basename(fn_rcw38))[0].split('_')[2]
+        
+        for jband, band in enumerate([90., 150, 220.]):
+            fig, ax = plt.subplots(2, 5, sharex=True, sharey=True, num=jband+1, figsize=(20,6))
+            ax = ax.flatten()
+            for jwafer, wafer in enumerate(['w172', 'w174', 'w176', 'w177', 'w180',
+                                            'w181', 'w188', 'w203', 'w204', 'w206']):
+                group = '{:.1f}_{}'.format(band, wafer)
+
+                ff_nuclear = np.array(fr_nuclear['AverageASDDiff']['frequency']/core.G3Units.Hz)
+                asd_nuclear = np.array(fr_nuclear['AverageASDDiff'][group]) / np.sqrt(2.)
+                ff_rcw38 = np.array(fr_rcw38['AverageASDDiff']['frequency']/core.G3Units.Hz)
+                asd_rcw38 = np.array(fr_rcw38['AverageASDDiff'][group]) / np.sqrt(2.)
+                
+                ff_nuclear_sum = np.array(fr_nuclear['AverageASDSum']['frequency']/core.G3Units.Hz)
+                asd_nuclear_sum = np.array(fr_nuclear['AverageASDSum'][group]) / np.sqrt(2.)
+                ff_rcw38_sum = np.array(fr_rcw38['AverageASDSum']['frequency']/core.G3Units.Hz)
+                asd_rcw38_sum = np.array(fr_rcw38['AverageASDSum'][group]) / np.sqrt(2.)
+
+                ax[jwafer].loglog(ff_nuclear_sum, asd_nuclear_sum, '--', label='x + y (nuclear)')
+                ax[jwafer].loglog(ff_rcw38_sum, asd_rcw38_sum, '--', label='x + y (rcw38)')
+                ax[jwafer].loglog(ff_nuclear, asd_nuclear, label='x - y (nuclear)')
+                ax[jwafer].loglog(ff_rcw38, asd_rcw38, label='x - y (rcw38)')
+                ax[jwafer].set_title('{}, {} GHz'.format(group.split('_')[1],
+                                                         int(float(group.split('_')[0]))))       
+            for jwafer in [5,6,7,8,9]:
+                ax[jwafer].set_xlabel('frequency [Hz]')
+
+            ax[0].set_ylabel('N [pA$ / \sqrt{Hz}$]')
+            ax[5].set_ylabel('NEI [pA$ / \sqrt{Hz}$]')
+            plt.ylim([1e2,1e5])
+            plt.legend(loc='upper right')
+            plt.tight_layout()
+            
+            plt.savefig('figures_rcw38_v_nuclear/difference_noise_{}_{}.png'\
+                        .format(int(band), obsid), dpi=120)
+            plt.close()
+```
+
+Now let's look at the distribution in gain-matching coefficients to see how far off our naive RCW38 calibration actually is.
+
+```python
+all_coeffs = {90:np.array([]), 150:np.array([]), 220:np.array([])}
+all_lowf_power_nuclear = {90:[], 150:[], 220:[]}
+all_lowf_power_rcw38 = {90:[], 150:[], 220:[]}
+for fn_rcw38 in fnames_rcw38:
+    filename = os.path.basename(fn_rcw38)
+    fn_gainmatch = np.unique([fn for fn in fnames_gainmatch if filename in fn])
+    
+    if len(fn_gainmatch) != 0:
+        fr_rcw38 = list(core.G3File(fn_rcw38))[1]
+        fr_nuclear = list(core.G3File(fn_gainmatch))[1]
+        
+        for jband, band in enumerate([90, 150, 220]):
+            coeffs = np.array([fr_nuclear["GainMatchCoeff"][bolo] \
+                               for bolo in fr_nuclear["GainMatchCoeff"].keys() \
+                               if boloprops[bolo].band/core.G3Units.GHz == band])
+            all_coeffs[band] = np.append(all_coeffs[band], coeffs)
+            
+            freqs = np.array(fr_nuclear['AverageASDDiff']['frequency']) / core.G3Units.Hz
+            for group in fr_nuclear['AverageASDDiff'].keys():
+                if str(band) in group:
+                    asd_nuclear = np.array(fr_nuclear['AverageASDDiff'][group])
+                    asd_rcw38 = np.array(fr_rcw38['AverageASDDiff'][group])
+                    all_lowf_power_nuclear[band].append(np.mean(asd_nuclear[(freqs>0.01) & (freqs<0.1)]))
+                    all_lowf_power_rcw38[band].append(np.mean(asd_rcw38[(freqs>0.01) & (freqs<0.1)]))
+```
+
+```python
+for band in [90, 150, 220]:
+    plt.hist(all_coeffs[band], bins=np.linspace(0.5, 1.5),
+             histtype='step', label='{} GHz'.format(band))
+plt.legend()
+plt.xlabel('gain-matching coefficient')
+plt.ylabel('bolometer-noise stares')
+plt.tight_layout()
+```
+
+```python
+plt.figure(figsize=(12,4))
+for jband, band in enumerate([90, 150, 220]):
+    plt.subplot(1,3,jband+1)
+    plt.hist(all_lowf_power_nuclear[band], bins=np.linspace(0,50000),
+             histtype='step', label='nuclear')
+    plt.hist(all_lowf_power_rcw38[band], bins=np.linspace(0,50000),
+             histtype='step', label='RCW38')
+    plt.title('{} GHz'.format(band))
+    plt.legend()
+# plt.xlabel('gain-matching coefficient')
+# plt.ylabel('bolometer-noise stares')
+plt.tight_layout()
+```
+
+```python
+plt.figure(figsize=(12,4))
+for jband, band in enumerate([90, 150, 220]):
+    plt.subplot(1,3,jband+1)
+    plt.hist(np.array(all_lowf_power_rcw38[band]) / \
+             np.array(all_lowf_power_nuclear[band]),
+             bins=np.linspace(0.9, 1.9),
+             histtype='step', label='nuclear')
+    plt.title('{} GHz'.format(band))
+plt.subplot(1,3,2)
+plt.xlabel('ratio average power in 0.01-0.1 Hz, RCW calib / nuclear calib')
+
+plt.subplot(1,3,1)
+plt.ylabel('median ASDs per noise stare per wafer')
+plt.tight_layout()
+plt.savefig('figures_rcw38_v_nuclear/lowf_power_ratio_rcw38_nuclear.png', dpi=120)
+```
+
+```python
+ls
 ```
 
 ```python
