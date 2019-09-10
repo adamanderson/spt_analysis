@@ -21,6 +21,8 @@ from spt3g import core, calibration
 from glob import glob
 import pydfmux
 import pickle
+import pandas as pd
+import os.path
 ```
 
 ## $1/f$ Noise Figure
@@ -272,15 +274,6 @@ freqs = [b.channel_map.lc_channel.frequency \
          for b in bolos \
          if b.channel_map.lc_channel.frequency > 1.e5]
 n_resonances = len(freqs)
-
-```
-
-```python
-print('Total number of good detectors = {}'.format(n_good_dets))
-print('Total number of detectors = {}'.format(n_total_dets))
-print('Yield of good detectors = {:.1f}%'.format(100 * n_good_dets / n_total_dets))
-print('number of bolometers with matched resonances = {:.0f} ({:.1f}%)'\
-      .format(n_resonances, 100 * n_resonances / n_total_dets))
 ```
 
 ```python
@@ -306,9 +299,38 @@ for fname in tuned_fnames:
 
 ```python
 n_tuned_median = np.median(list(ntuned.values()))
-print('median number of tuned bolometers = {:.0f} ({:.1f}%)'\
+```
+
+```python
+# A huge number of detectors are removed because they don't show a clear transition
+# in response to HR-10. These detectors are split between many different exclusion
+# lists, so let's combine them all to remove duplicates.
+exclude_path = '/home/adama/SPT/hardware_maps_southpole/2019/global/exclude'
+exclude_fnames = ['warmVcold_exclude_hr10.csv', 'exclude_hr10_dkan_20181213.csv',
+                  'exclude_suspecthr10_dkan_20181213.csv']
+exclude_names = []
+for fn in exclude_fnames:
+    df = pd.read_csv(os.path.join(exclude_path, fn))
+    exclude_names.extend(list(df['name']))
+exclude_names = np.unique(exclude_names)
+```
+
+```python
+print('Total number of detectors = {}'.format(n_total_dets))
+print('Detectors with good warm pinout = {} ({:.1f}%)'\
+      .format(n_good_dets, 100 * n_good_dets / n_total_dets))
+print('Detectors with matched resonances = {} ({:.1f}%)'\
+      .format(n_resonances, 100 * n_resonances / n_total_dets))
+print('Detectors removed by HR-10 exclusion = {}'\
+      .format(len(exclude_names)))
+print('Tuned bolometers = {:.0f} ({:.1f}%)'\
       .format(n_tuned_median, 100 * n_tuned_median / n_total_dets))
 ```
+
+Some other useful statistics:
+
+* Number of full modules removed = 10 or 660 channels
+ * These are a combination of noisy SQUIDs, and modules with shorts to ground that generated thermal heating on the wafer.
 
 ```python
 
