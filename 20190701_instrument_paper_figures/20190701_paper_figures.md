@@ -19,6 +19,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from spt3g import core, calibration
 from glob import glob
+import pydfmux
+import pickle
 ```
 
 ## $1/f$ Noise Figure
@@ -247,24 +249,65 @@ for band in nu.keys():
     print()
 ```
 
+## Yield
+Let's add up some numbers from Donna's spreadsheet on the trac wiki:
+
+https://spt-trac.grid.uchicago.edu/trac_south_pole/attachment/wiki/SummerJournal2018-2019/compare_all_wafers_to_last_year_19Nov2018.xlsx
+
 ```python
-johnson_noise_i
+n_good_dets_by_wafer = {'w172':1437, 'w174':1433, 'w176':1480, 'w177':1530, 'w180':1405,
+                        'w181':1367, 'w188':1241, 'w203':1456, 'w204':1409, 'w206':1408}
+n_good_dets = np.sum([n_good_dets_by_wafer[wafer] for wafer in n_good_dets_by_wafer])
+n_total_dets = 10*(66*24 - 6*2) # subtract off channels that go to alignment pixels
 ```
 
 ```python
-load_johnson_noise_i
+hwm_fname = '/home/adama/SPT/hardware_maps_southpole/2019/hwm_pole/hwm.yaml'
+hwm_pole = pydfmux.load_session(open(hwm_fname, 'r'))['hardware_map']
 ```
 
 ```python
-np.sqrt(11e-12**2 / 38e9)
+bolos = hwm_pole.query(pydfmux.Bolometer)
+freqs = [b.channel_map.lc_channel.frequency \
+         for b in bolos \
+         if b.channel_map.lc_channel.frequency > 1.e5]
+n_resonances = len(freqs)
+
 ```
 
 ```python
-
+print('Total number of good detectors = {}'.format(n_good_dets))
+print('Total number of detectors = {}'.format(n_total_dets))
+print('Yield of good detectors = {:.1f}%'.format(100 * n_good_dets / n_total_dets))
+print('number of bolometers with matched resonances = {:.0f} ({:.1f}%)'\
+      .format(n_resonances, 100 * n_resonances / n_total_dets))
 ```
 
 ```python
+tuned_fnames = []
+for dirstub in ['201908']:
+    fnames = glob('/big_scratch/pydfmux_output/{}*/'
+                  '*drop_bolos_*/data/TOTAL_DATA.pkl'.format(dirstub))
+    tuned_fnames += [fname for fname in fnames if 'tweak' not in fname]
+```
 
+```python
+ntuned = {}
+for fname in tuned_fnames:
+    with open(fname, 'rb') as f:
+        print(fname)
+        ntuned[fname] = 0
+        
+        d = pickle.load(f)
+        for mod in d.keys():
+            if type(d[mod])==dict and 'results_summary' in d[mod].keys():
+                ntuned[fname] += d[mod]['results_summary']['ntuned']
+```
+
+```python
+n_tuned_median = np.median(list(ntuned.values()))
+print('median number of tuned bolometers = {:.0f} ({:.1f}%)'\
+      .format(n_tuned_median, 100 * n_tuned_median / n_total_dets))
 ```
 
 ```python
