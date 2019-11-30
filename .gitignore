@@ -10,3 +10,4 @@ __pycache__
 *jpg
 *txt
 *dat
+.DS_Store
