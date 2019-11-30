@@ -217,10 +217,11 @@ def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50.,
         else:
             amp_fac = calc_current_sharing(freq=freqs, L_squid=L_squid, 
                                            Lstrip=Lstrip, rtes=rtes)
-            demod_filter_effect = calc_rc_fit(freqs, rdynsq)
+            demod_filter_effect = 1./calc_rc_fit(freqs, rdynsq)
             i_total_d_cs = amp_fac * i_total_d * demod_filter_effect
+            i_squid_cs = amp_fac * i_squid
         i_total = np.sqrt(i_total_c**2 + i_total_n**2 + i_total_d_cs**2 + \
-                          i_bias**2 + i_squid**2)
+                          i_bias**2 + i_squid_cs**2)
     if len(add_excess_demod)>0:
         i_total = np.sqrt(i_total_c**2 + i_total_n**2 + \
                           (i_total_d_cs*add_excess_demod)**2 + \
