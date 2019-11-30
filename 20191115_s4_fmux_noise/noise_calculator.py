@@ -108,15 +108,17 @@ def calc_nuller_noise(rf1=300., rf2=200., rg=300., r2=250., r3=50.,r5=100., r6=7
     i_total=np.sqrt(i_dac**2+i_lt6321**2+i_ths4131**2+i_mezz_res**2+i_sqbd_res1**2+i_sqbd_res2**2)    
     return i_total
 
-def calc_demod_noise(r1d=10.,rf1d=150., r2d=100., rf2d=400., r3d=50.,r4d=42., r5d=100., rdynsq=500.,zsquid=500.):
+def calc_demod_noise(r1d=10.,rf1d=150., r2d=100., rf2d=400., r3d=50.,r4d=42., r5d=100., roffset=100., rdynsq=500.,zsquid=500.):
+    stage1_gain = lt6200_gain(r1d, rf1d, roffset)
+
     #first stage amplifier
-    e_lt6200=calc_lt6200_noise(rf1d=rf1d,r1d=r1d,rdynsq=rdynsq)/((rf1d+r1d)/r1d)
+    e_lt6200=calc_lt6200_noise(rf1d=rf1d,r1d=r1d,roffset=roffset,rdynsq=rdynsq)/stage1_gain
     #print(e_lt6200)
     # second stage amplifier
-    e_ths4131_1=calc_ths4131_noise(rf2=rf2d, rg=r2d, r2=0)/((rf1d+r1d)/r1d)/(rf2d/r2d)
+    e_ths4131_1=calc_ths4131_noise(rf2=rf2d, rg=r2d, r2=0)/stage1_gain/(rf2d/r2d)
     #print(e_ths4131_1)
     # third stage amplifier
-    e_ths4131_2=calc_ths4131_noise(rf2=rf2d, rg=r2d, r2=0)/((rf1d+r1d)/r1d)/(rf2d/r2d)/(rf2d/r2d)
+    e_ths4131_2=calc_ths4131_noise(rf2=rf2d, rg=r2d, r2=0)/stage1_gain/(rf2d/r2d)/(rf2d/r2d)
     #print(e_ths4131_2)
     e_total=np.sqrt(e_lt6200**2+e_ths4131_1**2+e_ths4131_2**2)
     #print(e_total)
@@ -142,11 +144,18 @@ def calc_ths4131_noise(rf2=200., rg=300., r2=250.):
     e_total=np.sqrt(e_johnson**2+e_internal**2)
     return e_total
 
-def calc_lt6200_noise(r1d=10., rf1d=150., rdynsq=500.):
+def lt6200_gain(r1d=10., rf1d=150., roffset=100.):
+    reff = (r1d*roffset) / (r1d + roffset)
+    gain = (rf1d+reff)/reff
+    return gain
+
+def calc_lt6200_noise(r1d=10., rf1d=150., roffset=100., rdynsq=500.):
+    gain = lt6200_gain(r1d, rf1d, roffset)
+
     e_n_intrinsic=1.1e-9
-    i_n_intrinsic=2.2e-12
-    e_johnson= np.sqrt(4*k_b*T*rf1d + 4*k_b*T*r1d*((rf1d+r1d)/r1d)**2)
-    e_internal= np.sqrt( e_n_intrinsic**2*((rf1d+r1d)/r1d)**2 +(i_n_intrinsic*rdynsq*(rf1d+r1d)/r1d)**2+(i_n_intrinsic*rf1d)**2)
+    i_n_intrinsic=3.5e-12
+    e_johnson= np.sqrt(4*k_b*T*rf1d + 4*k_b*T*r1d*(gain)**2)
+    e_internal= np.sqrt( e_n_intrinsic**2*(gain)**2 +(i_n_intrinsic*rdynsq*gain)**2+(i_n_intrinsic*rf1d)**2)
     e_total=np.sqrt(e_johnson**2+e_internal**2)
     return e_total
 
@@ -180,7 +189,8 @@ def calc_rc_fit(freqs, Zd):
 def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50., 
                              r4=20., wireharness=0., rbias=0.03, rtes=1.5,
                              r5=100., r6=750.,r1d=10., rf1d=150., r2d=100.,
-                             rf2d=400., r3d=50., r4d=42., r5d=100., rdynsq=500.,
+                             rf2d=400., r3d=50., r4d=42., r5d=100., roffset=100., 
+                             rdynsq=500.,
                              zsquid=500., L_squid=60e-9, Lstrip=46e-9,
                              current_share_factor=False, rtes_v_f=False,
                              freqs=[0.], Tbias=4., add_excess=[],
@@ -194,7 +204,8 @@ def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50.,
                                   r6=r6)
     #print(i_total_n*1e12)
     i_total_d = calc_demod_noise(r1d=r1d,rf1d=rf1d, r2d=r2d, rf2d=rf2d, r3d=r3d,
-                                 r4d=r4d, r5d=r5d, rdynsq=rdynsq, zsquid=zsquid)
+                                 r4d=r4d, r5d=r5d, roffset=roffset, rdynsq=rdynsq,
+                                 zsquid=zsquid)
     #print(i_total_d*1e12)
     i_bias = calc_bias_resistor_noise(rbias=rbias,rtes=rtes,Tbias=Tbias)
     #print(i_bias*1e12)

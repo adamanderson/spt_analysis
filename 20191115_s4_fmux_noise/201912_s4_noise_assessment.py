@@ -33,6 +33,7 @@ rf2d=400.
 r3d=50.
 r4d=42.
 r5d=100.
+roffset=100.
 rdynsq=750.
 zsquid=750.
 L_squid=60e-9
@@ -47,14 +48,14 @@ add_excess_demod=[]
 f, i_n = calc_total_noise_current(rf1, rf2, rg, r2, r3, r4,
                                   wireharness, rbias, rtes, r5,
                                   r6, r1d, rf1d, r2d, rf2d,
-                                  r3d, r4d, r5d, rdynsq, zsquid,
+                                  r3d, r4d, r5d, roffset, rdynsq, zsquid,
                                   L_squid, Lstrip, current_share_factor,
                                   rtes_v_f, freqs, Tbias, add_excess,
                                   add_excess_demod)
 f, i_n_currentsharing = calc_total_noise_current(rf1, rf2, rg, r2, r3, r4,
                                   wireharness, rbias, rtes, r5,
                                   r6, r1d, rf1d, r2d, rf2d,
-                                  r3d, r4d, r5d, rdynsq, zsquid,
+                                  r3d, r4d, r5d, roffset, rdynsq, zsquid,
                                   L_squid, Lstrip, True,
                                   rtes_v_f, freqs, Tbias, add_excess,
                                   add_excess_demod)
@@ -63,7 +64,7 @@ e_total_c, i_total_c = calc_carrier_noise(rf1, rf2, rg, r2,
                                           rbias, rtes)
 i_total_n = calc_nuller_noise(rf1, rf2, rg, r2, r3, r5, r6)
 i_total_d = calc_demod_noise(r1d, rf1d, r2d, rf2d, r3d,
-                             r4d, r5d, rdynsq, zsquid)
+                             r4d, r5d, roffset, rdynsq, zsquid)
 i_bias = calc_bias_resistor_noise(rbias, rtes, Tbias)
 i_squid = calc_squid_noise()
 
@@ -141,8 +142,7 @@ print('carrier DAC = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_total_c*np.ones(f.
 print('nuller DAC = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_total_n*np.ones(f.shape))))
 print('demod chain = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_total_d*np.ones(f.shape)*amp_fac/calc_rc_fit(f, Zd=rdynsq))))
 print('bias resistor = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_bias*np.ones(f.shape))))
-print('SQUID = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_squid*np.ones(f.shape)*amp_fac)))
-print()
+print('SQUID = {:2f}'.format(np.interp(3.0e6, f, 1e12*i_total_c*np.ones(f.shape))))
 
 
 # SCENARIO #2A: Holding all constant, reduce Rdyn from 750 to 350 Ohm
@@ -151,14 +151,14 @@ rdynsq_new=350
 f, i_n = calc_total_noise_current(rf1, rf2, rg, r2, r3, r4,
                                   wireharness, rbias, rtes, r5,
                                   r6, r1d, rf1d, r2d, rf2d,
-                                  r3d, r4d, r5d, rdynsq_new, zsquid,
+                                  r3d, r4d, r5d, roffset, rdynsq_new, zsquid,
                                   L_squid, Lstrip, current_share_factor,
                                   rtes_v_f, freqs, Tbias, add_excess,
                                   add_excess_demod)
 f, i_n_currentsharing = calc_total_noise_current(rf1, rf2, rg, r2, r3, r4,
                                   wireharness, rbias, rtes, r5,
                                   r6, r1d, rf1d, r2d, rf2d,
-                                  r3d, r4d, r5d, rdynsq_new, zsquid,
+                                  r3d, r4d, r5d, roffset, rdynsq_new, zsquid,
                                   L_squid, Lstrip, True,
                                   rtes_v_f, freqs, Tbias, add_excess,
                                   add_excess_demod)
@@ -167,7 +167,7 @@ e_total_c, i_total_c = calc_carrier_noise(rf1, rf2, rg, r2,
                                           rbias, rtes)
 i_total_n = calc_nuller_noise(rf1, rf2, rg, r2, r3, r5, r6)
 i_total_d = calc_demod_noise(r1d, rf1d, r2d, rf2d, r3d,
-                             r4d, r5d, rdynsq_new, zsquid)
+                             r4d, r5d, roffset, rdynsq_new, zsquid)
 i_bias = calc_bias_resistor_noise(rbias, rtes, Tbias)
 i_squid = calc_squid_noise()
 
@@ -224,7 +224,7 @@ e_total_c, i_total_c = calc_carrier_noise(rf1, rf2, rg, r2,
                                           rbias, rtes)
 i_total_n = calc_nuller_noise(rf1, rf2, rg, r2, r3, r5, r6)
 i_total_d = calc_demod_noise(r1d, rf1d, r2d, rf2d, r3d,
-                             r4d, r5d, rdynsq, zsquid)
+                             r4d, r5d, roffset, rdynsq, zsquid)
 i_bias = calc_bias_resistor_noise(rbias, rtes, Tbias)
 i_squid = calc_squid_noise()
 
@@ -245,7 +245,7 @@ plt.ylabel('demod transfer function')
 plt.tight_layout()
 
 plt.figure()
-plt.plot(f, 1e12*i_n_currentsharing, label='total (with current sharing)')
+plt.plot(f, 1e12*i_n_total, label='total (with current sharing)')
 plt.plot(f, 1e12*i_total_c*np.ones(f.shape), label='carrier DAC')
 plt.plot(f, 1e12*i_total_n*np.ones(f.shape), label='nuller DAC')
 plt.plot(f, 1e12*i_total_d*np.ones(f.shape)*amp_fac/demod_tf, label='demod chain')
@@ -258,4 +258,4 @@ plt.legend()
 plt.tight_layout()
 plt.savefig('nei_v_f_2b.png', dpi=200)
 
-# plt.show()
+plt.show()
