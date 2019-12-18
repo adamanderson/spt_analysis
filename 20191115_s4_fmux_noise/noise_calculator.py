@@ -7,6 +7,16 @@ T=300  #K
 import numpy as np
 import matplotlib.pyplot as plt
 import pdb
+import pickle
+from scipy.interpolate import interp1d
+
+
+# load data for the RC filter effect
+# Structure of data is {freqs, Z}, where Z is the effective parallel impedance with the SQUID output
+rc_filt_dat = pickle.load(open('rc_filter.pkl','rb'))
+# "Equivalent impedance from the wireharness that is a parallel impedance with the SQUID output"
+Z_par_wh = interp1d(rc_filt_dat['freqs'], rc_filt_dat['Z'])
+
 
 def mezz_transfer_function(rf1=300.,rf2=200.,rg=300.):
     '''
@@ -149,43 +159,77 @@ def calc_bias_resistor_noise(rbias=0.03,rtes=1.5,Tbias=4):
 def calc_squid_noise(squid_noise=4.5e-12):
     return squid_noise
 
-def calc_current_sharing(freq=1.e6,L_squid=60.e-9,rtes=1.5,Lstrip=46e-9):
+def calc_current_sharing(freq=1.e6, L_squid=60.e-9, rtes=1.5, Lstrip=46e-9):
     amp_fac=np.abs(1.+ 2j*np.pi*freq*L_squid/(rtes+2j*np.pi*freq*Lstrip))
     return amp_fac
 
-def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50., r4=20., rwireharness=0., rbias=0.03, rtes=1.5,r5=100., r6=750.,r1d=10.,rf1d=150., r2d=100., rf2d=400., r3d=50.,r4d=42., r5d=100., rdynsq=500.,zsquid=500.,L_squid=60e-9,Lstrip=46e-9,current_share_factor=False,rtes_v_f=False,freqs=[0.],Tbias=4.,add_excess=[],add_excess_demod=[]):
+def calc_rc_fit(freqs, Zd):
+    """Empirical calibration for the parallel impedance due to the wire harness.
+    
+    This uses Amy Lowitz' measurements on unterminated SQUIDs where i've fit for the 
+    effective parallel resistance at every frequency to account for the observed transfer function.
+    
+    This seems portable (on the 4 SQUIDs i've tested it is right to within a few percent and variations
+    aren't systematic).
+    
+    Divide by the output of this to get the 'enhancement' factor when
+    referring voltages at the 1st stage amplifier to the output of the SQUID."""
+    
+    return (Z_par_wh(freqs)/(Zd+Z_par_wh(freqs)))
+
+def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50., 
+                             r4=20., wireharness=0., rbias=0.03, rtes=1.5,
+                             r5=100., r6=750.,r1d=10., rf1d=150., r2d=100.,
+                             rf2d=400., r3d=50., r4d=42., r5d=100., rdynsq=500.,
+                             zsquid=500., L_squid=60e-9, Lstrip=46e-9,
+                             current_share_factor=False, rtes_v_f=False,
+                             freqs=[0.], Tbias=4., add_excess=[],
+                             add_excess_demod=[]):
     #note this is the noise current through the squid coil
-    e_total_c,i_total_c=calc_carrier_noise(rf1=rf1, rf2=rf2, rg=rg, r2=r2, r3=r3, r4=r4, rwireharness=0., rbias=rbias, rtes=rtes)
+    e_total_c, i_total_c = calc_carrier_noise(rf1=rf1, rf2=rf2, rg=rg, r2=r2,
+                                              r3=r3, r4=r4, rwireharness=0.,
+                                              rbias=rbias, rtes=rtes)
     #print(i_total_c*1e12)
-    i_total_n=calc_nuller_noise(rf1=rf1, rf2=rf2, rg=rg, r2=r2, r3=r3,r5=r5, r6=r6)
+    i_total_n = calc_nuller_noise(rf1=rf1, rf2=rf2, rg=rg, r2=r2, r3=r3, r5=r5,
+                                  r6=r6)
     #print(i_total_n*1e12)
-    i_total_d=calc_demod_noise(r1d=r1d,rf1d=rf1d, r2d=r2d, rf2d=rf2d, r3d=r3d,r4d=r4d, r5d=r5d, rdynsq=rdynsq,zsquid=zsquid)
+    i_total_d = calc_demod_noise(r1d=r1d,rf1d=rf1d, r2d=r2d, rf2d=rf2d, r3d=r3d,
+                                 r4d=r4d, r5d=r5d, rdynsq=rdynsq, zsquid=zsquid)
     #print(i_total_d*1e12)
-    i_bias=calc_bias_resistor_noise(rbias=rbias,rtes=rtes,Tbias=Tbias)
+    i_bias = calc_bias_resistor_noise(rbias=rbias,rtes=rtes,Tbias=Tbias)
     #print(i_bias*1e12)
-    i_squid=calc_squid_noise()
+    i_squid = calc_squid_noise()
     #print(i_squid*1e12)
-    i_total=np.sqrt(i_total_c**2+i_total_n**2+i_total_d**2+i_bias**2+i_squid**2)
+    i_total = np.sqrt(i_total_c**2 + i_total_n**2 + i_total_d**2 + \
+                      i_bias**2 + i_squid**2)
     if len(freqs)==1 and freqs[0]==0.:
-        freqs=np.arange(1e6,6e6,1e4)
-        i_total=i_total*(np.zeros_like(freqs)+1)
+        freqs=np.arange(1e6, 6e6, 1e4)
+        i_total=i_total*(np.zeros_like(freqs) + 1)
     if current_share_factor:
         if rtes_v_f:
             #hardcoded 20% decrease in rtes as a function of frequency
-            rtes_ch=rtes*np.arange(1,0.6,-0.4/len(freqs))
-            amp_fac=np.zeros(len(freqs))
+            rtes_ch = rtes*np.arange(1, 0.6, -0.4/len(freqs))
+            amp_fac = np.zeros(len(freqs))
             for ii,kk in enumerate(freqs):
-                amp_fac[ii]=calc_current_sharing(freq=kk,L_squid=L_squid,Lstrip=Lstrip,rtes=rtes_ch[ii])            
+                amp_fac[ii] = calc_current_sharing(freq=kk, L_squid=L_squid, 
+                                                   Lstrip=Lstrip, 
+                                                   rtes=rtes_ch[ii])            
         else:
-            amp_fac=calc_current_sharing(freq=freqs,L_squid=L_squid,Lstrip=Lstrip,rtes=rtes)
-            i_total_d_cs=amp_fac*i_total_d
-        i_total=np.sqrt(i_total_c**2+i_total_n**2+i_total_d_cs**2+i_bias**2+i_squid**2)
+            amp_fac = calc_current_sharing(freq=freqs, L_squid=L_squid, 
+                                           Lstrip=Lstrip, rtes=rtes)
+            demod_filter_effect = 1./calc_rc_fit(freqs, rdynsq)
+            i_total_d_cs = amp_fac * i_total_d * demod_filter_effect
+            i_squid_cs = amp_fac * i_squid
+        i_total = np.sqrt(i_total_c**2 + i_total_n**2 + i_total_d_cs**2 + \
+                          i_bias**2 + i_squid_cs**2)
     if len(add_excess_demod)>0:
-        i_total=np.sqrt(i_total_c**2+i_total_n**2+(i_total_d_cs*add_excess_demod)**2+i_bias**2+i_squid**2)
+        i_total = np.sqrt(i_total_c**2 + i_total_n**2 + \
+                          (i_total_d_cs*add_excess_demod)**2 + \
+                          i_bias**2 + i_squid**2)
     if len(add_excess)>0:
-        i_total=i_total*add_excess
+        i_total = i_total*add_excess
     
-    return freqs,i_total
+    return freqs, i_total
 
     
 
