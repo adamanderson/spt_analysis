@@ -95,5 +95,5 @@ if args.show_coords:
     visufunc.projtext(-4.2/24*360, -5, '$20^h$', lonlat=True, color='w', fontsize=14)
     visufunc.projtext(3.8/24*360, -5, '$4^h$', lonlat=True, color='w', fontsize=14)
 
-plt.legend(fontsize=14, loc=(1.0,0.))
+plt.legend(fontsize=14, loc=(0.,0.8))
 plt.savefig('survey_footprints.png', dpi=200)
