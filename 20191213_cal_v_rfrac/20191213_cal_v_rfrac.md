@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 from functools import reduce
 ```
 
+## First test: calibrator response only
+
 ```python
 datapath = '/spt/user/production/calibration/calibrator/'
 obsids = {'w206': [93507113, 93508217, 93509295, 93510380, 93511444, 93512566]} #,
@@ -119,8 +121,170 @@ for obsid in cal_response[wafer].keys():
 plt.legend()
 ```
 
-```python
+## Second test: better S/N estimates
 
+```python
+cal_datapath = '/spt/user/production/calibration/calibrator/'
+nep_datapath = '/spt/user/production/calibration/noise/'
+obsids_cal = {'w206': [94405616, 94406496, 94407376, 94408259, 94409175],
+              'w174': [94410720, 94411599, 94412465, 94413333, 94415122]}
+obsids_noise = {'w206': [94405689, 94406569, 94407449, 94408332, 94409248],
+                'w174': [94410793, 94411672, 94412538, 94413407, 94415195]}
+bps = list(core.G3File('/spt/data/bolodata/fullrate/calibrator/'
+                       '93508217/offline_calibration.g3'))[0]["BolometerProperties"]
+
+cal_response = {}
+cal_rfrac = {}
+cal_bololist = {}
+nep = {}
+nep_bololist = {}
+
+for wafer in obsids_cal.keys():
+    cal_response[wafer] = {}
+    cal_rfrac[wafer] = {}
+    cal_bololist[wafer] = {}
+    nep[wafer] = {}
+    nep_bololist[wafer] = {}
+    
+    for obsid_cal, obsid_noise in zip(obsids_cal[wafer], obsids_noise[wafer]):
+        cal_data = list(core.G3File('{}/{}.g3'.format(cal_datapath, obsid_cal)))[0]
+        cal_response[wafer][obsid_cal] = []
+        cal_rfrac[wafer][obsid_cal] = []
+        cal_bololist[wafer][obsid_cal] = []
+        
+        nep_data = list(core.G3File('{}/{}.g3'.format(nep_datapath, obsid_noise)))[0]
+        nep[wafer][obsid_noise] = []
+        nep_bololist[wafer][obsid_noise] = []
+
+        for bolo in cal_data["CalibratorResponse"].keys():
+            if bps[bolo].band/core.G3Units.GHz == 90 and \
+               bps[bolo].wafer_id == wafer and \
+               np.isfinite(cal_data["CalibratorResponse"][bolo]) and\
+               np.isfinite(cal_data["CalibratorResponseRfrac"][bolo]):
+                cal_response[wafer][obsid_cal].append(cal_data["CalibratorResponse"][bolo])
+                cal_rfrac[wafer][obsid_cal].append(cal_data["CalibratorResponseRfrac"][bolo])
+                cal_bololist[wafer][obsid_cal].append(bolo)
+        
+        cal_response[wafer][obsid_cal] = np.array(cal_response[wafer][obsid_cal])
+        cal_rfrac[wafer][obsid_cal] = np.array(cal_rfrac[wafer][obsid_cal])
+        cal_bololist[wafer][obsid_cal] = np.array(cal_bololist[wafer][obsid_cal])
+        
+        for bolo in nep_data["NEP_10.0Hz_to_15.0Hz"].keys():
+            if bps[bolo].band/core.G3Units.GHz == 90 and \
+               bps[bolo].wafer_id == wafer and \
+               np.isfinite(nep_data["NEP_10.0Hz_to_15.0Hz"][bolo]):
+                nep[wafer][obsid_noise].append(nep_data["NEP_10.0Hz_to_15.0Hz"][bolo])
+                nep_bololist[wafer][obsid_noise].append(bolo)
+        
+        nep[wafer][obsid_noise] = np.array(nep[wafer][obsid_noise])
+        nep_bololist[wafer][obsid_noise] = np.array(nep_bololist[wafer][obsid_noise])
+```
+
+```python
+for jwafer,wafer in enumerate(cal_rfrac.keys()):
+    common_bolos = reduce(np.intersect1d, cal_bololist[wafer].values())
+    random_bolos = np.random.choice(common_bolos, 10, replace=False)
+
+    plt.figure(jwafer)
+    for bolo in random_bolos:
+        rfracs    = np.array([cal_rfrac[wafer][obsid][cal_bololist[wafer][obsid]==bolo] \
+                              for obsid in cal_rfrac[wafer].keys()])
+        responses = np.array([cal_response[wafer][obsid][cal_bololist[wafer][obsid]==bolo] \
+                              for obsid in cal_response[wafer].keys()])
+        plt.plot(rfracs,
+                 responses/(core.G3Units.watt*1e-15), 
+                 'o-', label='{}'.format(bolo))
+    plt.title(wafer)
+    plt.legend()
+    plt.ylabel('rfrac')
+    plt.ylabel('(nominal) calibrator response [fW]')
+    plt.tight_layout()
+#     plt.savefig('{}_cal_by_bolo.png'.format(wafer), dpi=150)
+```
+
+```python
+for jwafer, wafer in enumerate(cal_response):
+    plt.figure(jwafer)
+    
+    for obsid in cal_response[wafer]:
+        plt.hist(cal_response[wafer][obsid]/(core.G3Units.watt*1e-15),
+                 bins=np.linspace(0,3,51),
+                 histtype='stepfilled', alpha=0.5,
+                 label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][obsid])))
+    plt.title(wafer)
+    plt.legend()
+    plt.xlabel('(nominal) calibrator response [fW]')
+    plt.ylabel('bolometers')
+    plt.tight_layout()
+    plt.savefig('{}_cal_hist_2.png'.format(wafer), dpi=150)
+```
+
+```python
+for jwafer, wafer in enumerate(nep):
+    plt.figure(jwafer)
+    
+    for obsid_nep, obsid_cal in zip(nep[wafer], cal_response[wafer]):
+        plt.hist(nep[wafer][obsid_nep]/(core.G3Units.watt*1e-18 / np.sqrt(core.G3Units.Hz)),
+                 bins=np.linspace(0,200,51),
+                 histtype='stepfilled', alpha=0.5,
+                 label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][obsid_cal])))
+    plt.title(wafer)
+    plt.legend()
+    plt.xlabel('NEP [aW / $\sqrt{Hz}$]')
+    plt.ylabel('bolometers')
+    plt.tight_layout()
+    plt.savefig('{}_nep_2.png'.format(wafer), dpi=150)
+```
+
+```python
+for jwafer, wafer in enumerate(cal_response):
+    plt.figure(jwafer)
+    
+    for obsid_cal, obsid_noise in zip(obsids_cal[wafer], obsids_noise[wafer]):
+        cal_sn = []
+        for jbolo, bolo in enumerate(cal_bololist[wafer][obsid_cal]):
+            if bolo in nep_bololist[wafer][obsid_noise]:
+                cal_sn.append((cal_response[wafer][obsid_cal][jbolo]) / \
+                              (nep[wafer][obsid_noise][nep_bololist[wafer][obsid_noise]==bolo][0]/\
+                                   (1 / np.sqrt(core.G3Units.Hz))))
+                
+        plt.hist(cal_sn,
+                 bins=np.linspace(0,50,51),
+                 histtype='stepfilled', alpha=0.5,
+                 label='rfrac = {:.2f}; median S/N = {:.2f}'\
+                             .format(np.mean(cal_rfrac[wafer][obsid_cal]),
+                                     np.median(cal_sn)))
+    plt.title(wafer)
+    plt.legend()
+    plt.xlabel('calibrator S/N [$\sqrt{Hz}$]')
+    plt.ylabel('bolometers')
+    plt.tight_layout()
+    plt.savefig('{}_cal_sn_2.png'.format(wafer), dpi=150)
+```
+
+```python
+for jwafer, wafer in enumerate(cal_response):
+    cal_common_bolos = reduce(np.intersect1d, cal_bololist[wafer].values())
+    nep_common_bolos = reduce(np.intersect1d, nep_bololist[wafer].values())
+    common_bolos = np.intersect1d(cal_common_bolos, nep_common_bolos)
+    random_bolos = np.random.choice(common_bolos, 10, replace=False)
+    
+    plt.figure(jwafer)
+    for bolo in random_bolos:
+        rfracs    = np.array([cal_rfrac[wafer][obsid][cal_bololist[wafer][obsid]==bolo] \
+                              for obsid in cal_rfrac[wafer].keys()])
+        responses = np.array([cal_response[wafer][obsid][cal_bololist[wafer][obsid]==bolo] \
+                              for obsid in cal_response[wafer].keys()])
+        neps = np.array([nep[wafer][obsid][nep_bololist[wafer][obsid]==bolo] \
+                              for obsid in nep[wafer].keys()])
+        plt.plot(rfracs, responses / neps * np.sqrt(core.G3Units.sec), 
+                 'o-', label='{}'.format(bolo))
+    plt.legend()
+    plt.title(wafer)
+    plt.xlabel('rfrac')
+    plt.ylabel('calibrator S/N [arb.]')
+    plt.tight_layout()
+    plt.savefig('{}_cal_sn_by_bolo_2.png'.format(wafer), dpi=150)
 ```
 
 ```python
