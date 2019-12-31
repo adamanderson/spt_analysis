@@ -19,6 +19,8 @@ import numpy as np
 from spt3g import core, calibration
 import matplotlib.pyplot as plt
 from functools import reduce
+import os
+import pickle
 ```
 
 ## First test: calibrator response only
@@ -123,6 +125,9 @@ plt.legend()
 
 ## Second test: better S/N estimates
 
+
+### Calibrator S/N
+
 ```python
 cal_datapath = '/spt/user/production/calibration/calibrator/'
 nep_datapath = '/spt/user/production/calibration/noise/'
@@ -130,6 +135,7 @@ obsids_cal = {'w206': [94405616, 94406496, 94407376, 94408259, 94409175],
               'w174': [94410720, 94411599, 94412465, 94413333, 94415122]}
 obsids_noise = {'w206': [94405689, 94406569, 94407449, 94408332, 94409248],
                 'w174': [94410793, 94411672, 94412538, 94413407, 94415195]}
+band = '90 GHz'
 bps = list(core.G3File('/spt/data/bolodata/fullrate/calibrator/'
                        '93508217/offline_calibration.g3'))[0]["BolometerProperties"]
 
@@ -194,12 +200,12 @@ for jwafer,wafer in enumerate(cal_rfrac.keys()):
         plt.plot(rfracs,
                  responses/(core.G3Units.watt*1e-15), 
                  'o-', label='{}'.format(bolo))
-    plt.title(wafer)
+    plt.title('{}: {}'.format(wafer, band))
     plt.legend()
-    plt.ylabel('rfrac')
+    plt.xlabel('rfrac')
     plt.ylabel('(nominal) calibrator response [fW]')
     plt.tight_layout()
-#     plt.savefig('{}_cal_by_bolo.png'.format(wafer), dpi=150)
+    plt.savefig('{}_cal_by_bolo_2.png'.format(wafer), dpi=150)
 ```
 
 ```python
@@ -211,7 +217,7 @@ for jwafer, wafer in enumerate(cal_response):
                  bins=np.linspace(0,3,51),
                  histtype='stepfilled', alpha=0.5,
                  label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][obsid])))
-    plt.title(wafer)
+    plt.title('{}: {}'.format(wafer, band))
     plt.legend()
     plt.xlabel('(nominal) calibrator response [fW]')
     plt.ylabel('bolometers')
@@ -228,7 +234,7 @@ for jwafer, wafer in enumerate(nep):
                  bins=np.linspace(0,200,51),
                  histtype='stepfilled', alpha=0.5,
                  label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][obsid_cal])))
-    plt.title(wafer)
+    plt.title('{}: {}'.format(wafer, band))
     plt.legend()
     plt.xlabel('NEP [aW / $\sqrt{Hz}$]')
     plt.ylabel('bolometers')
@@ -254,7 +260,7 @@ for jwafer, wafer in enumerate(cal_response):
                  label='rfrac = {:.2f}; median S/N = {:.2f}'\
                              .format(np.mean(cal_rfrac[wafer][obsid_cal]),
                                      np.median(cal_sn)))
-    plt.title(wafer)
+    plt.title('{}: {}'.format(wafer, band))
     plt.legend()
     plt.xlabel('calibrator S/N [$\sqrt{Hz}$]')
     plt.ylabel('bolometers')
@@ -280,11 +286,59 @@ for jwafer, wafer in enumerate(cal_response):
         plt.plot(rfracs, responses / neps * np.sqrt(core.G3Units.sec), 
                  'o-', label='{}'.format(bolo))
     plt.legend()
-    plt.title(wafer)
+    plt.title('{}: {}'.format(wafer, band))
     plt.xlabel('rfrac')
     plt.ylabel('calibrator S/N [arb.]')
     plt.tight_layout()
     plt.savefig('{}_cal_sn_by_bolo_2.png'.format(wafer), dpi=150)
+```
+
+### Tuning yield
+Joshua questioned whether we would latch bolometers by dropping deeper into the transition to gain responsivity. Let's check the detector yield on the wafer/band combos that we tuned. These data are also from the 12/29/2019 test.
+
+```python
+pydfmux_dir = '/scratch/pydfmux_output/20191229'
+tuning_dirs = {'w206': ['20191229_153549_drop_bolos_tweak_bolos',
+                        '20191229_155521_drop_bolos_tweak_bolos',
+                        '20191229_161007_drop_bolos_tweak_bolos',
+                        '20191229_162444_drop_bolos_tweak_bolos',
+                        '20191229_163928_drop_bolos_tweak_bolos'],
+               'w174': ['20191229_170540_drop_bolos_tweak_bolos',
+                        '20191229_172026_drop_bolos_tweak_bolos',
+                        '20191229_173504_drop_bolos_tweak_bolos',
+                        '20191229_174928_drop_bolos_tweak_bolos',
+                        '20191229_181840_drop_bolos_tweak_bolos']}
+```
+
+```python
+ntuned = {}
+for wafer in tuning_dirs:
+    ntuned[wafer] = []
+    
+    for tuning_dir in tuning_dirs[wafer]:
+        tuning_data = pickle.load(open(os.path.join(pydfmux_dir, tuning_dir, 'data/TOTAL_DATA.pkl'), 'rb'))
+        
+        ntuned[wafer].append(0)
+        for mod in tuning_data:
+            if mod != 'output_directory' and mod != 'temps': # these are not modules
+                for chan in tuning_data[mod]['subtargets']:
+                    if wafer in tuning_data[mod]['subtargets'][chan]['physical_name'] and \
+                       tuning_data[mod]['subtargets'][chan]['observing_band'] == 90 and \
+                       tuning_data[mod]['subtargets'][chan]['state'] == 'tuned':
+                        ntuned[wafer][-1] += 1
+#                 chans = list(tuning_data[mod]['subtargets'].keys())
+#                 if len(chans) != 0 and \
+#                    wafer in tuning_data[mod]['subtargets'][chans[0]]['physical_name'] and \
+#                    tuning_data[mod]['subtargets'][chans[0]]['observing_band'] == 90:
+#                     ntuned[wafer][-1] += 1
+```
+
+```python
+ntuned
+```
+
+```python
+tuning_data['015/8/2/1']['results_summary']
 ```
 
 ```python
