@@ -201,19 +201,16 @@ def delta_chi2_plus1(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB, var_Dl_EB,
     return pol_chi2(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB, var_Dl_EB) - func_min - 1
 
 
-nsim_ul = 2000
-
-
 if args.mode == 'singlemap':
-    delta_chi2_sims = np.zeros(nsim_ul)
-    angle_fit = np.zeros(nsim_ul)
-    angle_up1sigma = np.zeros(nsim_ul)
-    angle_down1sigma = np.zeros(nsim_ul)
+    delta_chi2_sims = np.zeros(args.n_sims)
+    angle_fit = np.zeros(args.n_sims)
+    angle_up1sigma = np.zeros(args.n_sims)
+    angle_down1sigma = np.zeros(args.n_sims)
 
     Cl_random = {}
     for spectrum in ['TB', 'TE', 'EB', 'EE', 'BB']:
-        Cl_random[spectrum] = np.zeros(nsim_ul)
-    Dl_sims = np.zeros(nsim_ul)
+        Cl_random[spectrum] = np.zeros(args.n_sims)
+    Dl_sims = np.zeros(args.n_sims)
 
 
     # generate the simulated spectra
@@ -251,6 +248,7 @@ if args.mode == 'singlemap':
                                                   np.var(Cl_random['TB']), np.var(Cl_random['EB']), Dl_sims[jsim]))
         except RuntimeError:
             print('Failed to estimate error bar. Skipping simulation.')
+
     plt.figure(1)
     hist_range = np.std(angle_up1sigma) * 4 * 180/np.pi
     _ = plt.hist(angle_up1sigma * 180/np.pi, histtype='step',
