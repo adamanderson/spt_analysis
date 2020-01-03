@@ -4,6 +4,7 @@ import camb
 import argparse as ap
 from scipy.optimize import minimize, newton
 from scipy.stats import chi2, sigmaclip
+from timedomainfitting import *
 
 P0 = ap.ArgumentParser(description='Script for estimating the sensitivity of '
                        'the axion rotation analysis using the EB estimator.',
@@ -46,7 +47,12 @@ SP1.add_argument('--lmin', action='store', type=int, default=100,
                  help='lmin to use for analysis.')
 SP1.add_argument('--lmax', action='store', type=int, default=3000,
                  help='lmax to use for analysis.')
-
+SP1.add_argument('--time-domain-fit', action='store_true',
+                 help='Do profile-likelihood fit of time-domain data.')
+SP1.add_argument('--n-expectation-sims', action='store', type=int, default=1000,
+                 help='Instead of simulating a single realization of the '
+                 'time-domain data, simulate many of them and compute '
+                 'the expectation of the fit parameters.')
 args = P0.parse_args()
 
 
@@ -372,16 +378,16 @@ elif args.mode == 'timeseries':
         angle_fit[jbundle] = out.x
         chi2_sims[jbundle] = out.fun
 
-        angle_up1sigma[jbundle] = newton(delta_chi2_plus1,
-                                         x0=angle_fit[jbundle] + 0.01,
-                                         args=(Cl_per_bundle['TB'][jbundle],
-                                               Cl_per_bundle['TE'][jbundle],
-                                               Cl_per_bundle['EB'][jbundle],
-                                               Cl_per_bundle['EE'][jbundle],
-                                               Cl_per_bundle['BB'][jbundle],
-                                               np.var(Cl_random['TB']),
-                                               np.var(Cl_random['EB']),
-                                               chi2_sims[jbundle]))
+        angle_up1sigma[jbundle]   = newton(delta_chi2_plus1,
+                                           x0=angle_fit[jbundle] + 0.01,
+                                           args=(Cl_per_bundle['TB'][jbundle],
+                                                 Cl_per_bundle['TE'][jbundle],
+                                                 Cl_per_bundle['EB'][jbundle],
+                                                 Cl_per_bundle['EE'][jbundle],
+                                                 Cl_per_bundle['BB'][jbundle],
+                                                 np.var(Cl_random['TB']),
+                                                 np.var(Cl_random['EB']),
+                                                 chi2_sims[jbundle]))
         angle_down1sigma[jbundle] = newton(delta_chi2_plus1,
                                            x0=angle_fit[jbundle] - 0.01,
                                            args=(Cl_per_bundle['TB'][jbundle],
@@ -394,21 +400,41 @@ elif args.mode == 'timeseries':
                                                  chi2_sims[jbundle]))
 
     # symmetrize the error
-    angle_error_per_obs = (angle_up1sigma - angle_down1sigma) / 2
+    angle_error = (angle_up1sigma - angle_down1sigma) / 2
 
     # The minimizer sometimes fails and best fit ends up at N*pi/4 away from zero.
     # For now, just throw these values away.
     # TODO: Do something sensible with these values.
     angle_fit_clipped, clip_lower, clip_upper = sigmaclip(angle_fit, low=3, high=3)
-    angle_error_per_obs_clipped = angle_error_per_obs[(angle_fit>clip_lower) & \
-                                                      (angle_fit<clip_upper)]
+    angle_error_clipped = angle_error[(angle_fit>clip_lower) & \
+                                      (angle_fit<clip_upper)]
     angle_fit = angle_fit_clipped
-    angle_error_per_obs = angle_error_per_obs_clipped
+    angle_error = angle_error_clipped
+    times = np.arange(len(angle_fit))
 
+
+    if args.time_domain_fit:
+        periods_to_test = np.arange(4, 80)
+        amplitude_best_fit = np.zeros(len(periods_to_test))
+        for jperiod, period in enumerate(periods_to_test):
+            amplitudes = np.linspace(0, 2e-2)
+            test_stats = np.array([test_stat(A, period, times, angle_fit, angle_error) for A in amplitudes])
+            neg2logL_global_fval, neg2logL_global_params = neg2logL_global_fit(period, times, angle_fit, angle_error)
+            amplitude_best_fit[jperiod] = neg2logL_global_params[0]
     
+
+    ### PLOTTING ###
+    plt.figure(1)
+    plt.plot(periods_to_test, amplitude_best_fit * 180 / np.pi)
+    plt.xlabel('oscillation period [# of bundles]')
+    plt.ylabel('oscillation amplitude [deg]')
+    plt.title('best-fit oscillation amplitude (single realization)')
+    plt.tight_layout()
+    plt.savefig('bestfit_A_vs_period.png', dpi=150)
+
     plt.figure(2)
     _ = plt.errorbar(np.arange(len(angle_fit)), angle_fit * 180/np.pi,
-                     yerr=angle_error_per_obs * 180/np.pi,
+                     yerr=angle_error * 180/np.pi,
                      linestyle='None', marker='o', markersize=3)
     plt.xlabel('bundle index')
     plt.ylabel('rotation angle [deg]')
@@ -417,3 +443,5 @@ elif args.mode == 'timeseries':
               .format(args.obs_per_bundle, noise_per_bundle))
     plt.tight_layout()
     plt.savefig('angle_vs_bundle.png', dpi=150)
+
+
