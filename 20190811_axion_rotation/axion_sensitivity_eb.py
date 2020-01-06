@@ -53,6 +53,9 @@ SP1.add_argument('--n-expectation-sims', action='store', type=int, default=1,
                  help='Instead of simulating a single realization of the '
                  'time-domain data, simulate many of them and compute '
                  'the expectation of the fit parameters.')
+SP1.add_argument('--simulate-limits', action='store_true',
+                 help='Simulate the +/-1sigma upper and lower limits on the '
+                 'oscillation amplitude using the profile likelihood.')
 args = P0.parse_args()
 
 
@@ -245,10 +248,17 @@ def pol_chi2(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB, var_Dl_EB):
     return chi2_array
 
 
-def delta_chi2_plus1(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB,
-                     var_Dl_EB, func_min):
+def delta_chi2_plus(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB,
+                    var_Dl_EB, func_min, offset):
     return pol_chi2(x, Cl_TB, Cl_TE, Cl_EB, Cl_EE, Cl_BB, var_Dl_TB, var_Dl_EB) - \
-        func_min - 1
+        func_min - offset
+
+
+def neg2logL_profiled_plus(A, period, times, angle, angle_error, func_min,
+                           offset):
+    fval, profiled_phase = neg2logL_profiled(A, period, times, angle, angle_error) - \
+                           func_min - offset
+    return fval
 
 
 # simulated maps for either the single-map mode or for
@@ -296,7 +306,7 @@ if args.mode == 'singlemap':
                                               Cl_random['BB'][jsim],
                                               np.var(Cl_random['TB']),
                                               np.var(Cl_random['EB'])) - chi2_sims[jsim]
-            angle_up1sigma[jsim]   = newton(delta_chi2_plus1,
+            angle_up1sigma[jsim]   = newton(delta_chi2_plus,
                                             x0=angle_fit[jsim] + 0.01,
                                             args=(Cl_random['TB'][jsim],
                                                   Cl_random['TE'][jsim],
@@ -305,8 +315,8 @@ if args.mode == 'singlemap':
                                                   Cl_random['BB'][jsim],
                                                   np.var(Cl_random['TB']),
                                                   np.var(Cl_random['EB']),
-                                                  chi2_sims[jsim]))
-            angle_down1sigma[jsim] = newton(delta_chi2_plus1,
+                                                  chi2_sims[jsim], 1))
+            angle_down1sigma[jsim] = newton(delta_chi2_plus,
                                             x0=angle_fit[jsim] - 0.01,
                                             args=(Cl_random['TB'][jsim],
                                                   Cl_random['TE'][jsim],
@@ -315,7 +325,7 @@ if args.mode == 'singlemap':
                                                   Cl_random['BB'][jsim],
                                                   np.var(Cl_random['TB']),
                                                   np.var(Cl_random['EB']),
-                                                  chi2_sims[jsim]))
+                                                  chi2_sims[jsim], 1))
         except RuntimeError:
             print('Failed to estimate error bar. Skipping simulation.')
 
@@ -344,8 +354,10 @@ elif args.mode == 'timeseries':
     angle_down1sigma  = np.zeros((args.n_bundles, args.n_expectation_sims))
     angle_error       = np.zeros((args.n_bundles, args.n_expectation_sims))
     
-    periods_to_test = np.arange(4, 80)
-    amplitude_best_fit = np.zeros((len(periods_to_test), args.n_expectation_sims))
+    periods_to_test       = np.arange(4, 80)
+    amplitude_best_fit    = np.zeros((len(periods_to_test), args.n_expectation_sims))
+    amplitude_up1sigma    = np.zeros((len(periods_to_test), args.n_expectation_sims))
+    amplitude_down1sigma  = np.zeros((len(periods_to_test), args.n_expectation_sims))
 
     Cl_per_bundle = {}
     for spectrum in ['TB', 'TE', 'EB', 'EE', 'BB']:
@@ -385,7 +397,7 @@ elif args.mode == 'timeseries':
             angle_fit[jbundle, jsim] = out.x
             chi2_sims[jbundle, jsim] = out.fun
 
-            angle_up1sigma[jbundle, jsim]   = newton(delta_chi2_plus1,
+            angle_up1sigma[jbundle, jsim]   = newton(delta_chi2_plus,
                                                x0=angle_fit[jbundle, jsim] + 0.01,
                                                args=(Cl_per_bundle['TB'][jbundle, jsim],
                                                      Cl_per_bundle['TE'][jbundle, jsim],
@@ -394,8 +406,8 @@ elif args.mode == 'timeseries':
                                                      Cl_per_bundle['BB'][jbundle, jsim],
                                                      np.var(Cl_random['TB']),
                                                      np.var(Cl_random['EB']),
-                                                     chi2_sims[jbundle, jsim]))
-            angle_down1sigma[jbundle, jsim] = newton(delta_chi2_plus1,
+                                                     chi2_sims[jbundle, jsim], 1.0))
+            angle_down1sigma[jbundle, jsim] = newton(delta_chi2_plus,
                                                x0=angle_fit[jbundle, jsim] - 0.01,
                                                args=(Cl_per_bundle['TB'][jbundle, jsim],
                                                      Cl_per_bundle['TE'][jbundle, jsim],
@@ -404,7 +416,7 @@ elif args.mode == 'timeseries':
                                                      Cl_per_bundle['BB'][jbundle, jsim],
                                                      np.var(Cl_random['TB']),
                                                      np.var(Cl_random['EB']),
-                                                     chi2_sims[jbundle, jsim]))
+                                                     chi2_sims[jbundle, jsim], 1.0))
 
             # symmetrize the error
             angle_error[jbundle, jsim] = (angle_up1sigma[jbundle, jsim] - \
@@ -419,8 +431,22 @@ elif args.mode == 'timeseries':
                 neg2logL_global_fval, neg2logL_global_params = neg2logL_global_fit(period, times,
                                                                                    angle_fit[:, jsim],
                                                                                    angle_error[:, jsim])
-                amplitude_best_fit[jperiod, jsim] = neg2logL_global_params[0]
-    
+                amplitude_best_fit[jperiod, jsim]    = neg2logL_global_params[0]
+                if args.simulate_limits:
+                    amplitude_up1sigma[jperiod, jsim]    = newton(neg2logL_profiled_plus,
+                                                                x0=amplitude_best_fit[jperiod, jsim]+0.1,
+                                                                args=(period, times,
+                                                                      angle_fit[:, jsim],
+                                                                      angle_error[:, jsim],
+                                                                      neg2logL_global_fval,
+                                                                      1.0))
+                    amplitude_down1sigma[jperiod, jsim]  = newton(neg2logL_profiled_plus,
+                                                                  x0=amplitude_best_fit[jperiod, jsim]-0.1,
+                                                                  args=(period, times,
+                                                                        angle_fit[:, jsim],
+                                                                        angle_error[:, jsim],
+                                                                        neg2logL_global_fval,
+                                                                        1.0))
 
     ### PLOTTING ###
     if args.time_domain_fit:
@@ -430,9 +456,9 @@ elif args.mode == 'timeseries':
         plt.plot(periods_to_test, np.median(amplitude_best_fit, axis=1) * 180 / np.pi,
                  '--', color='C1', label='median expected amplitude')
         plt.plot(periods_to_test, np.percentile(amplitude_best_fit, 15.9, axis=1) * 180 / np.pi,
-                 ':', color='C1', label='-1$\sigma$ expected amplitude')
+                 ':', color='C1', label='+/-1$\sigma$ range of amplitude')
         plt.plot(periods_to_test, np.percentile(amplitude_best_fit, 84.1, axis=1) * 180 / np.pi,
-                 ':', color='C1', label='+1$\sigma$ expected amplitude')
+                 ':', color='C1')
 
         plt.xlabel('oscillation period [# of bundles]')
         plt.ylabel('oscillation amplitude [deg]')
@@ -440,6 +466,41 @@ elif args.mode == 'timeseries':
         plt.legend()
         plt.tight_layout()
         plt.savefig('bestfit_A_vs_period.png', dpi=150)
+        
+        if args.simulate_limits:
+            plt.figure(10)
+            plt.plot(periods_to_test, amplitude_up1sigma[:,0] * 180 / np.pi,
+                     color='C0', label='observed +1$\sigma$ limit')
+            plt.plot(periods_to_test, np.median(amplitude_up1sigma, axis=1) * 180 / np.pi,
+                     '--', color='C1', label='median +1$\sigma$ limit')
+            plt.plot(periods_to_test, np.percentile(amplitude_up1sigma, 15.9, axis=1) * 180 / np.pi,
+                     ':', color='C1', label='+/-1$\sigma$ range of limit')
+            plt.plot(periods_to_test, np.percentile(amplitude_up1sigma, 84.1, axis=1) * 180 / np.pi,
+                     ':', color='C1')
+
+            plt.xlabel('oscillation period [# of bundles]')
+            plt.ylabel('oscillation amplitude [deg]')
+            plt.title('best-fit oscillation amplitude (single realization)')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig('up1sigma_A_vs_period.png', dpi=150)
+
+            plt.figure(11)
+            plt.plot(periods_to_test, amplitude_down1sigma[:,0] * 180 / np.pi,
+                     color='C0', label='observed -1$\sigma$ limit')
+            plt.plot(periods_to_test, np.median(amplitude_down1sigma, axis=1) * 180 / np.pi,
+                     '--', color='C1', label='median -1$\sigma$ limit')
+            plt.plot(periods_to_test, np.percentile(amplitude_down1sigma, 15.9, axis=1) * 180 / np.pi,
+                     ':', color='C1', label='+/-1$\sigma$ range of limit')
+            plt.plot(periods_to_test, np.percentile(amplitude_down1sigma, 84.1, axis=1) * 180 / np.pi,
+                     ':', color='C1')
+
+            plt.xlabel('oscillation period [# of bundles]')
+            plt.ylabel('oscillation amplitude [deg]')
+            plt.title('best-fit oscillation amplitude (single realization)')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig('down1sigma_A_vs_period.png', dpi=150)
 
     plt.figure(2)
     _ = plt.errorbar(np.arange(len(angle_fit[:,0])), angle_fit[:,0] * 180/np.pi,
