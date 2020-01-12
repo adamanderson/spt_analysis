@@ -468,9 +468,11 @@ for jwafer, wafer in enumerate(cal_response):
 cal_datapath = '/spt/user/production/calibration/calibrator/'
 nep_datapath = '/spt/user/production/calibration/noise/'
 obsids_cal   = {90: [94510526, 94511474, 94512391, 94513312, 94514261],
-                150: [94515238, 94516167, 94517074, 94518167, 94519494]}
+                150: [94719976, 94720953, 94721928, 94723114, 94724218],
+                220: [95115583, 95116529, 95117446, 95118373, 95119272]}
 obsids_noise = {90: [94510599, 94511547, 94512464, 94513385, 94514334],
-                150: [94515311, 94516240, 94517147, 94518240, 94519568]}
+                150: [94720049, 94721026, 94722001, 94723187, 94724291],
+                220: [95115656, 95116602, 95117519, 95118446, 95119345]}
 bps = list(core.G3File('/spt/data/bolodata/fullrate/calibrator/'
                        '93508217/offline_calibration.g3'))[0]["BolometerProperties"]
 
@@ -529,7 +531,7 @@ for wafer in ['w172', 'w174', 'w176', 'w177', 'w180', 'w181', 'w188', 'w203', 'w
 ```
 
 ```python
-max_response = {90: 4, 150: 15}
+max_response = {90: 4, 150: 15, 220: 15}
 
 for jband, band in enumerate(list(cal_response[wafer].keys())):
     plt.figure(jband, figsize=(10,16))
@@ -539,7 +541,9 @@ for jband, band in enumerate(list(cal_response[wafer].keys())):
             plt.hist(cal_response[wafer][band][obsid]/(core.G3Units.watt*1e-15),
                      bins=np.linspace(0,max_response[band],51),
                      histtype='stepfilled', alpha=0.5,
-                     label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][band][obsid])))
+                     label='rfrac = {:.2f}; median resp. = {:.2f}'\
+                                 .format(np.mean(cal_rfrac[wafer][band][obsid]),
+                                         np.median(cal_response[wafer][band][obsid]/(core.G3Units.watt*1e-15))))
         plt.title('{}: {}'.format(wafer, band))
         plt.legend()
         plt.xlabel('(nominal) calibrator response [fW]')
@@ -554,10 +558,14 @@ for jband, band in enumerate(list(cal_response[wafer].keys())):
     for jwafer, wafer in enumerate(cal_response):
         plt.subplot(5, 2, jwafer+1)
         for obsid_nep, obsid_cal in zip(nep[wafer][band], cal_response[wafer][band]):
-            plt.hist(nep[wafer][band][obsid_nep]/(core.G3Units.watt*1e-18 / np.sqrt(core.G3Units.Hz)),
+            nep_aWperrtHz = nep[wafer][band][obsid_nep]/\
+                            (core.G3Units.watt*1e-18 / np.sqrt(core.G3Units.Hz))
+            plt.hist(nep_aWperrtHz,
                      bins=np.linspace(0,300,51),
                      histtype='stepfilled', alpha=0.5,
-                     label='rfrac = {:.2f}'.format(np.mean(cal_rfrac[wafer][band][obsid_cal])))
+                     label='rfrac = {:.2f}; median NEP = {:.2f}'\
+                                 .format(np.mean(cal_rfrac[wafer][band][obsid_cal]),
+                                         np.median(nep_aWperrtHz[(nep_aWperrtHz>1) & (nep_aWperrtHz<300)])))
         plt.title('{}: {}'.format(wafer, band))
         plt.legend()
         plt.xlabel('NEP [aW / $\sqrt{Hz}$]')
@@ -579,7 +587,8 @@ for jband, band in enumerate(list(cal_response[wafer].keys())):
                                   (nep[wafer][band][obsid_noise][nep_bololist[wafer][band][obsid_noise]==bolo][0]/\
                                        (1 / np.sqrt(core.G3Units.Hz))))
 
-            plt.hist(cal_sn,
+            cal_sn = np.array(cal_sn)
+            plt.hist(cal_sn[(cal_sn>0) & (cal_sn<150)],
                      bins=np.linspace(0,100,51),
                      histtype='stepfilled', alpha=0.5,
                      label='rfrac = {:.2f}; median S/N = {:.2f}'\
