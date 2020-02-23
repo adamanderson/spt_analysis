@@ -50,6 +50,7 @@ def calc_chi2(pol_rotation, obs_maps, coadd_maps, subfield=None):
         
     for jpol, pol_rot in enumerate(pol_rotation):
         npixels = len(obs_noweight['Q'])
+        print(npixels)
         delta_f = 3
         chi2_per_pixel = np.zeros((obs_noweight['Q'].shape[0],
                                    obs_noweight['Q'].shape[1]))
