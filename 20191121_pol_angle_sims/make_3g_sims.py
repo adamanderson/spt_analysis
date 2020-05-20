@@ -1,0 +1,1 @@
+/home/adama/SPT/spt3g_software/simulations/scripts/make_3g_sims.py

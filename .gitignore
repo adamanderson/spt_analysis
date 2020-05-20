@@ -12,3 +12,8 @@ __pycache__
 *dat
 .DS_Store
 *rst
+*gz
+*fits
+*txt
+*log
+*out
