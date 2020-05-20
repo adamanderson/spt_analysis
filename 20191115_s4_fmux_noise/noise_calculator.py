@@ -194,7 +194,7 @@ def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50.,
                              zsquid=500., L_squid=60e-9, Lstrip=46e-9,
                              current_share_factor=False, rtes_v_f=False,
                              freqs=[0.], Tbias=4., add_excess=[],
-                             add_excess_demod=[]):
+                             add_excess_demod=[], squid_noise=4.5e-12):
     #note this is the noise current through the squid coil
     e_total_c, i_total_c = calc_carrier_noise(rf1=rf1, rf2=rf2, rg=rg, r2=r2,
                                               r3=r3, r4=r4, rwireharness=0.,
@@ -209,7 +209,7 @@ def calc_total_noise_current(rf1=300., rf2=200., rg=300., r2=250., r3=50.,
     #print(i_total_d*1e12)
     i_bias = calc_bias_resistor_noise(rbias=rbias,rtes=rtes,Tbias=Tbias)
     #print(i_bias*1e12)
-    i_squid = calc_squid_noise()
+    i_squid = calc_squid_noise(squid_noise)
     #print(i_squid*1e12)
     i_total = np.sqrt(i_total_c**2 + i_total_n**2 + i_total_d**2 + \
                       i_bias**2 + i_squid**2)
