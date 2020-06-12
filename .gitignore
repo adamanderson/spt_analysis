@@ -7,6 +7,11 @@
 __pycache__
 *pdf
 *g3
+*jpg
+*txt
+*dat
+.DS_Store
+*rst
 *gz
 *fits
 *txt
