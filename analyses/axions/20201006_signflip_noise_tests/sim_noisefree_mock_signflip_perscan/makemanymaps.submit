@@ -1,0 +1,32 @@
+executable = makemanymaps.sh
+universe = vanilla
+
+error = /scratch/adama/condor_logs/20201006_signflip_noise_tests/$(JobID)-err.log
+output = /scratch/adama/condor_logs/20201006_signflip_noise_tests/$(JobID)-out.log
+log = /scratch/adama/condor_logs/20201006_signflip_noise_tests/condor_noisefree_mock_signflip_perscan.log
+
++WANT_RCC_ciconnect = True
++ProjectName = "spt.all"
+request_cpus = 1
+#Requirements = ((OSGVO_OS_STRING == "RHEL 6") || (OSGVO_OS_STRING == "RHEL 7")) && (HAS_CVMFS_spt_opensciencegrid_org)
+#Requirements = (OSGVO_OS_STRING == "RHEL 7") && (HAS_CVMFS_spt_opensciencegrid_org) && !regexp("osg.*novalocal", Machine) && (OSG_HOSTNAME != "its-condor-ce2.syr.edu") && (OSG_HOSTNAME != "its-condor-ce3.syr.edu")
+Requirements = (OSGVO_OS_STRING == "RHEL 7") && (HAS_CVMFS_spt_opensciencegrid_org) && (OSG_HOSTNAME =!= "its-condor-ce2.syr.edu") && (OSG_HOSTNAME =!= "its-condor-ce3.syr.edu")
+
+request_disk = 20000000
+#request_memory = 2048
+#request_memory = 4096
+request_memory = 5GB
+
+transfer_output_files = ""
+should_transfer_files = YES
+run_as_owner = False
+when_to_transfer_output = ON_EXIT
+transfer_input_files = master_field_mapmaker_signflip.py,$(YAMLFile),1500d_ptsrc_and_decrement_list.txt, axiontod.py
+use_x509userproxy = True
+transfer_executable = True
+periodic_release =  (NumJobStarts < 5) && ((CurrentTime - EnteredCurrentStatus) > (60*60))
+
+arguments = "$(OutputFiles) $(ExtraArgs) $(InputFiles)"
+
+
+queue 1
