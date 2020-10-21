@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import camb
 from camb import model, initialpower
-from scipy.optimize import minimize, fsolve, brentq
+from scipy.optimize import minimize, fsolve, brentq, newton
 from scipy.stats import chi2, sigmaclip
 ```
 
@@ -33,7 +33,7 @@ pars.set_for_lmax(2500, lens_potential_accuracy=0);
 results = camb.get_results(pars)
 
 #get dictionary of CAMB power spectra
-powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
+powers =results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True)
 for name in powers: print(name)
 ```
 
@@ -46,22 +46,24 @@ print(totCL.shape)
 #The different CL are always in the order TT, EE, BB, TE (with BB=0 for unlensed scalar results).
 ls = np.arange(totCL.shape[0])
 fig, ax = plt.subplots(3,2, figsize = (12,12))
-ax[0,0].plot(ls,totCL[:,0], color='k')
-ax[0,0].plot(ls,unlensedCL[:,0], color='r')
+cl2dl = ls*(ls+1) / (2*np.pi)
+
+ax[0,0].plot(ls, totCL[:,0] * cl2dl, color='k')
+ax[0,0].plot(ls, unlensedCL[:,0] * cl2dl, color='r')
 ax[0,0].set_title('TT')
 ax[0,1].plot(ls[2:], 1-unlensedCL[2:,0]/totCL[2:,0]);
 ax[0,1].set_title(r'$\Delta TT$')
-ax[1,0].plot(ls,totCL[:,1], color='k')
-ax[1,0].plot(ls,unlensedCL[:,1], color='r')
+ax[1,0].plot(ls, totCL[:,1] * cl2dl, color='k')
+ax[1,0].plot(ls, unlensedCL[:,1] * cl2dl, color='r')
 ax[1,0].set_title(r'$EE$')
-ax[1,1].plot(ls,totCL[:,3], color='k')
-ax[1,1].plot(ls,unlensedCL[:,3], color='r')
+ax[1,1].plot(ls, totCL[:,3] * cl2dl, color='k')
+ax[1,1].plot(ls, unlensedCL[:,3] * cl2dl, color='r')
 ax[1,1].set_title(r'$TE$');
-ax[2,0].plot(ls,totCL[:,2], color='k')
-ax[2,0].plot(ls,unlensedCL[:,2], color='r')
+ax[2,0].plot(ls, totCL[:,2] * cl2dl, color='k')
+ax[2,0].plot(ls, unlensedCL[:,2] * cl2dl, color='r')
 ax[2,0].set_title(r'$BB$')
-ax[2,1].plot(ls,totCL[:,3], color='k')
-ax[2,1].plot(ls,unlensedCL[:,3], color='r')
+ax[2,1].plot(ls, totCL[:,3] * cl2dl, color='k')
+ax[2,1].plot(ls, unlensedCL[:,3] * cl2dl, color='r')
 ax[2,1].set_title(r'$TE$');
 for ax in ax.reshape(-1): ax.set_xlim([2,2500]);
 ```

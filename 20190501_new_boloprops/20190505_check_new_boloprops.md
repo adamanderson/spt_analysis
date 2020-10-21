@@ -35,8 +35,8 @@ The 1st half 2018 data is slightly complicated by the fact that we had not yet a
 Note that I also modified `build_bolo_props_*.py` and `build_cal_frames.py` in order to use an optional new method for outlier removal. The idea is to cut values of pointing offsets that differ by more than 2 pixel spacings from the median offset for all bolometers at the same pixel. This works slightly better than the current method, although there may still be a few outliers that could be hand-removed.
 
 ```python
-dold2018_1 = list(core.G3File('/spt/user/production/calibration/boloproperties/31000000.g3'))[0]
-dnew2018_1 = list(core.G3File('/home/adama/SPT/spt_analysis/20190501_new_boloprops/31000000_new.g3'))[0]
+# dold2018_1 = list(core.G3File('/spt/user/production/calibration/boloproperties/31000000.g3'))[0]
+# dnew2018_1 = list(core.G3File('/home/adama/SPT/spt_analysis/20190501_new_boloprops/31000000_new.g3'))[0]
 dold2018_2 = list(core.G3File('/spt/user/production/calibration/boloproperties/40000000.g3'))[0]
 dnew2018_2 = list(core.G3File('/home/adama/SPT/spt3g_software/calibration/scripts/40000000_new.g3'))[0]
 dold2019 = list(core.G3File('/spt/user/production/calibration/boloproperties/60000000.g3'))[0]

@@ -50,6 +50,9 @@ plt.plot(times, pol_angles, marker='o', linewidth=0, markersize=4, color='C0')
 plt.errorbar(times, pol_angles, yerr=pol_err, ls='none', color='C0')
 plt.xlabel('observation time [sec]')
 plt.ylabel('polarization rotation angle [deg]')
+plt.tight_layout()
+
+plt.savefig('example_pol_v_time.png', dpi=200)
 ```
 
 ```python
@@ -57,48 +60,67 @@ plt.ylabel('polarization rotation angle [deg]')
 freq = 1/(60*60*24*21)   # 1/(7 days)
 n_amp_points = 50
 n_phase_points = 50
-phase_grid_2d, amp_grid_2d = np.meshgrid(np.linspace(0, 2*np.pi, n_phase_points),
-                                         np.linspace(0, 1, n_amp_points))
+phase_grid = np.linspace(0, 2*np.pi, n_phase_points)
+amp_grid = np.linspace(0, 1, n_amp_points)
+phase_grid_2d, amp_grid_2d = np.meshgrid(phase_grid, amp_grid)
 amp_grid_1d = np.unique(amp_grid_2d)
 
 posterior = np.zeros(n_amp_points * n_phase_points)
-for jpoint, pair in enumerate(zip(np.hstack(phase_grid), np.hstack(amp_grid))):
+for jpoint, pair in enumerate(zip(np.hstack(phase_grid_2d),
+                                  np.hstack(amp_grid_2d))):
     phase, amp = pair
-    posterior[jpoint] = timefittools.posterior(amp, freq, phase, data)
+    posterior[jpoint] = timefittools.posterior(amp, freq, phase, data, chi2_min=0)
 posterior = np.reshape(posterior, newshape=(n_amp_points, n_phase_points))
 
-posterior_marginal     = np.array([timefittools.posterior_marginal(amp, freq, data) \
+posterior_marginal     = np.array([timefittools.posterior_marginal(amp, freq,
+                                                                   data, chi2_min=0) \
                                    for amp in amp_grid_1d])
-posterior_marginal_cdf = np.array([timefittools.posterior_marginal_cdf(amp, freq, data) \
+posterior_marginal_cdf = np.array([timefittools.posterior_marginal_cdf(amp, freq,
+                                                                       data, chi2_min=0) \
                                    for amp in amp_grid_1d])
-Acl = timefittools.upper_limit_bayesian(freq, data, 0.95, [1e-3, 1])
+Acl = timefittools.upper_limit_bayesian(freq, data, 0.95, [1e-3, 1], chi2_min=0)
 ```
 
 ```python
 plt.imshow(posterior, origin='lower', aspect='auto',
-           extent=(np.min(phase_grid), np.max(phase_grid),
-                   np.min(amp_grid), np.max(amp_grid)),)
+           extent=(np.min(phase_grid_2d), np.max(phase_grid_2d),
+                   np.min(amp_grid_2d), np.max(amp_grid_2d)),)
+plt.xlabel('phase [rad]')
+plt.ylabel('amplitude [deg]')
+plt.tight_layout()
+plt.savefig('example_pol_v_phase.png', dpi=200)
 ```
 
 ```python
-plt.plot(amp_grid_1d, posterior_marginal / np.max(posterior_marginal))
-plt.plot(amp_grid_1d, posterior_marginal_cdf)
-plt.plot([Acl, Acl], [0, 1], '--C2')
+plt.plot(amp_grid_1d, posterior_marginal / np.max(posterior_marginal),
+         label='posterior PDF')
+plt.plot(amp_grid_1d, posterior_marginal_cdf,
+         label='posterior CDF')
+plt.plot([Acl, Acl], [0, 1], '--C2', label='95% CL upper limit')
 plt.plot([0, 1], [0.95, 0.95], '--C2')
 plt.axis([0,1,0,1])
+plt.xlabel('$A$ [deg]')
+plt.legend()
+plt.tight_layout()
+plt.savefig('example_posterior.png', dpi=200)
 ```
 
 ```python
 plt.figure(figsize=(12,4))
-plt.plot(times, pol_angles, marker='o', linewidth=0, markersize=4, color='C0')
+plt.plot(times, pol_angles, marker='o', linewidth=0, markersize=4,
+         color='C0', label='fake data')
 plt.errorbar(times, pol_angles, yerr=pol_err, ls='none', color='C0')
-plt.plot(times, timefittools.time_domain_model(Acl, freq, 0, times), color='C1')
+plt.plot(times, timefittools.time_domain_model(Acl, freq, 0, times),
+         color='C1', label='95% UL oscillation')
 plt.xlabel('observation time [sec]')
 plt.ylabel('polarization rotation angle [deg]')
+plt.legend()
+plt.tight_layout()
+plt.savefig('example_pol_v_time_withUL.png', dpi=200)
 ```
 
 ## Checking output from simulation script
-Let's check the output of `simulate_time_domain.py`. This run simulated 1.5deg / observation pol angles for 500 observations over 270 days.
+Let's check the output of `simulate_time_domain.py`. This run simulated 0.6deg / observation pol angles for 1000 observations over 270 days.
 
 ```python
 sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_test_full2/*.pkl')
@@ -161,7 +183,7 @@ with open('obsids_1500d_2019.pkl', 'wb') as f:
 Now let's look at some output from the grid simulation.
 
 ```python
-sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_2019_test/*.pkl')
+sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_test_full2/*.pkl')
 
 upper_lims = {}
 for fname in sim_fnames:
@@ -223,7 +245,7 @@ plt.savefig('amplitude_limit_1p8deg_err_uniform_interval.png', dpi=150)
 ## Forecast Plot
 
 ```python
-sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_2019_test/*.pkl')
+sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_test_full3/*.pkl')
 
 upper_lims = {}
 for fname in sim_fnames:
@@ -241,6 +263,12 @@ for fname in sim_fnames:
 freqs = np.array(list(upper_lims.keys()))
 m_axion_2019 = 2*np.pi*freqs/(60*60*24) * 6.528e-16
 median_upper_lims_2019 = np.array([np.median(upper_lims[freq]) for freq in freqs])
+
+def freq2maxion(freq):
+    return 2*np.pi*freq/(60*60*24) * 6.528e-16
+
+def maxion2freq(maxion):
+    return maxion / (2*np.pi/(60*60*24) * 6.528e-16)
 ```
 
 ```python
@@ -257,7 +285,7 @@ g_limit_planck = 9.6e-13 * (m_axion / 1e-21) # from equation (73) of 1903.02666
 plt.loglog(m_axion, g_limit_planck)
 plt.fill_between(m_axion, g_limit_planck, 1, alpha=0.2)
 plt.text(1.3e-23, 2e-13, s='Planck "washout"',
-             rotation=33, color='C1')
+             rotation=30, color='C1')
 
 # small-scale structure (limit is very approximate)
 m_limit_sss = 1e-22 # from 1610.08297
@@ -268,21 +296,61 @@ plt.text(6e-23, 4e-11, s='small-scale structure', rotation=90)
 g_limit_2019 = median_upper_lims_2019 * (2*np.pi / 360) * 2 / 2.1e9 * \
                     (m_axion_2019/1e-21)
 plt.loglog(m_axion_2019, g_limit_2019, '-C3')
-plt.text(3.5e-21, 1e-10, s='SPT-3G 2019 (150 GHz) forecast',
-             rotation=33, ha='center', color='C3')
+plt.text(3.5e-21, 4e-11, s='SPT-3G 2019 (150 GHz) forecast',
+             rotation=30, ha='center', color='C3')
 
-plt.loglog(m_axion_2019, g_limit_2019 / np.sqrt(10), '--C3')
-plt.text(5e-21, 2e-11, s='SPT-3G 5-year (95 + 150 GHz) forecast',
-             rotation=33, ha='center', color='C3')
-
+plt.loglog(m_axion_2019, g_limit_2019 / np.sqrt(5), '--C3')
+plt.text(5e-21, 0.7e-11, s='SPT-3G 5-year (150 GHz) forecast',
+             rotation=30, ha='center', color='C3')
 plt.axis([1e-23, 1e-18, 1e-14, 1e-9])
 plt.xlabel('$m_a$ [eV]')
 plt.ylabel('$g_{a\gamma}$ [GeV$^{-1}$]')
+
+plt.gca().twiny()
+plt.gca().set_xscale('log')
+plt.xlim([maxion2freq(1e-23), maxion2freq(1e-18)])
+plt.xlabel('$f$ [day$^{-1}$]')
+
 plt.tight_layout()
 plt.savefig('axion_forecast.png', dpi=200)
 ```
 
 ```python
+sim_fnames = glob('/sptlocal/user/adama/axions/time_domain_fitting/timefit_test_full3/*.pkl')
 
+upper_lims = {}
+for fname in sim_fnames:
+    with open(fname, 'rb') as f:
+        ul_data = pickle.load(f)
+
+    freqs = list(ul_data['results'][0]['upper limit'].keys())
+    for freq in freqs:
+        if freq not in upper_lims:
+            upper_lims[freq] = []
+        else:
+            upper_lims[freq].extend([ul_data['results'][jsim]['upper limit'][freq] \
+                                     for jsim in ul_data['results'].keys()])
+    
+freqs = np.sort(list(upper_lims.keys()))
+upper_lims_median = [np.median(upper_lims[freq]) for freq in freqs]
+upper_lims_down1_sigma = [np.percentile(upper_lims[freq], 16) for freq in freqs]
+upper_lims_up1_sigma = [np.percentile(upper_lims[freq], 84) for freq in freqs]
+```
+
+```python
+plt.fill_between(freqs, upper_lims_down1_sigma, upper_lims_up1_sigma, color='yellow',
+                 label='$\pm 1 \sigma$ range of limit')
+plt.semilogx(freqs, upper_lims_median, 'g',
+             label='median limit')
+
+plt.xlabel('frequency [d$^{-1}$]')
+plt.ylabel('95% CL upper limit on oscillation amplitude [deg]')
+plt.ylim(0,0.1)
+plt.legend()
+plt.tight_layout()
+plt.savefig('amplitude_limit_1p8deg_err_2019.png', dpi=150)
+```
+
+```python
 
 ```

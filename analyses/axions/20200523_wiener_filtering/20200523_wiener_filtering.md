@@ -656,5 +656,20 @@ plt.savefig('flatsky_template_with_noise_qu.png', dpi=200)
 ```
 
 ```python
+plt.figure(1)
+_ = plt.hist(fit_angles, bins=np.linspace(-15,15,21),
+             histtype='step',
+             label='no filter ($\sigma = ${:.2f}$^\circ$)'.format(np.std(fit_angles)))
+_ = plt.hist(fit_angles_wiener, bins=np.linspace(-15,15,21),
+             histtype='step',
+             label='with Wiener filter ($\sigma = ${:.2f}$^\circ$)'.format(np.std(fit_angles_wiener)))
+plt.legend()
+plt.xlabel('estimated polarization angle [deg]')
+plt.ylabel('realizations')
+plt.tight_layout()
+plt.savefig('fit_angles_with_wiener.png', dpi=200)
+```
+
+```python
 
 ```

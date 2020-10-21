@@ -336,7 +336,7 @@ plt.savefig('KS_test_pvalues_zoom.png', dpi=150)
 ## Checking variance
 
 ```python
-with open('weights_var_factors.pkl', 'rb') as f:
+with open('weights_var_factors_backup.pkl', 'rb') as f:
     data_kstest = pickle.load(f)
 
 std_value = {}
@@ -350,10 +350,10 @@ for field in data_kstest['std_factor']:
 ```python
 plt.figure(1, figsize=(10,8))
 
-for jfield, field in enumerate(ks_pvalue):
+for jfield, field in enumerate(std_value):
     plt.subplot(2, 2, jfield+1)
     plt.grid()
-    for jband, band in enumerate(ks_pvalue[field]):
+    for jband, band in enumerate(std_value[field]):
         plt.hist(std_value[field][band], bins=np.linspace(1.75, 3.5 ,41),
                  histtype='step', label='{} GHz'.format(band))
     plt.title('field: {}'.format(field))
@@ -365,6 +365,45 @@ plt.legend()
 plt.savefig('std_pixel_values.png', dpi=150)
 ```
 
+## Changing the map settings systematically with Kyle's maps
+Based on some arguments above, I convinced myself that the standard deviations would behave more consistently if I used a higher low-pass filter. Kyle has made maps with a variety of mapmaking settings that we can use to test this hypothesis.
+
+```python
+
+```
+
+```python
+plt.figure(1, figsize=(10,8))
+
+lpf_list = [3300, 5000, 6600, 8000]
+for lpf in lpf_list:
+    fname = 'weights_var_factors_2019_4_res_300_hpf_{}_lpf_lrcoadd.pkl'.format(lpf)
+    with open(fname, 'rb') as f:
+        data_kstest = pickle.load(f)
+
+    std_value = {}
+    for field in data_kstest['std_factor']:
+        std_value[field] = {90:[], 150:[], 220:[]}
+        for obsid in data_kstest['std_factor'][field]:
+            for band in std_value[field]:
+                std_value[field][band].append(data_kstest['std_factor'][field][obsid][band])
+
+    for jfield, field in enumerate(np.sort(list(std_value.keys()))):
+        plt.subplot(2, 2, jfield+1)
+        plt.grid()
+        std_plot = np.hstack([std_value[field][band] for band in std_value[field]])
+
+        plt.hist(std_plot, bins=np.linspace(2.5, 4.0 ,41),
+                 histtype='step', label='LPF = {}'.format(lpf))
+        plt.title('field: {}'.format(field))
+        plt.xlim([2.5, 4.0])
+        plt.xlabel('std$[Q_i \\times \sqrt{W_{qqi}}]$')
+        plt.ylabel('observations')
+        plt.legend()
+plt.tight_layout()
+plt.savefig('std_pixel_values_varyLPF.png', dpi=150)
+```
+
 ## References
 [1] - https://pole.uchicago.edu/spt3g/index.php/Estimation_of_per-observation_angle_uncertainties
 
@@ -372,11 +411,15 @@ plt.savefig('std_pixel_values.png', dpi=150)
 ## Scratch
 
 ```python
-np.mean(std_value[field][band])
+std_value
 ```
 
 ```python
-'{:.2e}'.format(1.234234)
+data_kstest['ks_result'].keys()
+```
+
+```python
+3.56**2
 ```
 
 ```python

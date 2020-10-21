@@ -1,3 +1,17 @@
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.3'
+#       jupytext_version: 0.8.6
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
 # quick test to calculate the pixel-pixel covariance over all of Daniel's 2018 EE maps
 import numpy as np
 from spt3g import core, mapmaker

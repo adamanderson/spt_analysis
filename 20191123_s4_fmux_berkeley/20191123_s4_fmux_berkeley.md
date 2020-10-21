@@ -336,6 +336,170 @@ plt.grid()
 plt.savefig('NEI_0p1_hz_no_photons.png', dpi=200)
 ```
 
+## Addendum: 1/f followup from Assessment
+As a followup from the readout assessment, Amy and Zeesh requested that I send around the fit to the 1/f spectrum from our noise stares. I am taking this from 
+
+```python
+dcal = list(core.G3File('/spt/data/bolodata/fullrate/noise/77863968/'
+                        'offline_calibration.g3'))
+bps = dcal[0]["BolometerProperties"]
+d = list(core.G3File('horizon_noise_77863968_bender_ltd_perbolo_only.g3'))
+
+nei_0p1_hz = {90:[], 150:[], 220:[]}
+params_horizon_noise = {'white noise':[],
+                        'A':[],
+                        'alpha':[]}
+for bolo in d[1]["ASDFitParams"].keys():
+    if bps[bolo].band / core.G3Units.GHz in avg_nei[f_range]:
+        par = d[1]["ASDFitParams"][bolo]
+        if len(par) == 3:
+            params_horizon_noise['white noise'].append(par[0])
+            params_horizon_noise['A'].append(par[1])
+            params_horizon_noise['alpha'].append(par[2])
+```
+
+```python
+_ = plt.hist(params_horizon_noise['white noise'], bins=np.linspace(0,50,51))
+```
+
+```python
+units = core.G3Units.
+_ = plt.hist(np.array(params_horizon_noise['white noise']) / ,
+             bins=np.linspace(0,1000,41))
+```
+
+```python
+core.G3Units.Hz
+```
+
+```python
+fr = list(core.G3File('horizon_noise_77863968_bender_ltd.g3'))[1]
+
+band_numbers = {90.: 1, 150.: 2, 220.: 3}
+subplot_numbers = {90.: 1, 150.: 1, 220.: 1}
+band_labels = {90:'95', 150:'150', 220:'220'}
+band_freqs = {90:'[1.6 - 2.3 MHz]', 150:'[2.3 - 3.5 MHz]', 220:'[3.5 - 5.2 MHz]'}
+```
+
+```python
+nei_min = 5
+nei_max = 1000
+
+for wafer in ['w172', 'w174', 'w176', 'w177', 'w180', 'w181', 'w188', 'w203', 'w204', 'w206']:
+    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=(8,8))
+    fig.subplots_adjust(wspace=0)
+    for jband, band in enumerate([90., 150., 220.]):
+
+        group = '{:.1f}_{}'.format(band, wafer)
+
+        ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+        ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
+        asd_diff = np.array(fr['AverageASDDiff'][group]) / np.sqrt(2.)
+        asd_sum = np.array(fr['AverageASDSum'][group]) / np.sqrt(2.)
+
+        par = fr["AverageASDDiffFitParams"][group]
+        ax[jband].loglog(ff_sum[ff_sum<75], asd_sum[ff_sum<75],
+                         label='pair sum (measured)', color='0.6')
+        ax[jband].loglog(ff_diff[ff_diff<75], asd_diff[ff_diff<75],
+                         label='pair difference (measured)', color='k')
+        ax[jband].loglog(ff_sum, atm_noise(ff_sum, par[1], par[2]) / np.sqrt(2.),
+                         'C0--', label='low-frequency noise')
+        ax[jband].loglog(ff_sum, readout_noise(ff_sum, par[0]) / np.sqrt(2.),
+                         'C2--', label='white noise')
+        ax[jband].loglog(ff_sum, horizon_model(ff_sum, *list(par)) / np.sqrt(2.),
+                         'C3--', label='total noise model')
+
+        ax[jband].set_ylabel('current noise [pA/$\sqrt{Hz}$]', fontsize=14)
+        ax[jband].grid()
+        ax[jband].set_ylim([nei_min, nei_max])
+        ax[jband].set_xlim([0.003, 100])
+        ax[jband].annotate('{} GHz ($f_{{bias}} \in ${})'.format(band_labels[band],
+                                                           band_freqs[band]),
+                     (0.01,500), fontsize=14)
+        ax[jband].tick_params(axis='both', labelsize=14)
+
+        ax2 = ax[jband].twinx()
+        ax2.set_ylabel('NEP [aW/$\sqrt{Hz}$]', fontsize=14)
+        ax2.set_ylim([nei2nep(nei_min*1e-12, median_vbias_rms[band]) * 1e18,
+                      nei2nep(nei_max*1e-12, median_vbias_rms[band]) * 1e18])
+        ax2.set_yscale('log')
+        ax2.tick_params(axis='both', labelsize=14)
+
+    plt.suptitle(wafer)
+    ax[2].legend(fontsize=12)
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0)
+    ax[2].set_xlabel('frequency [Hz]', fontsize=14)
+
+    # plt.savefig('w180_horizon_noise_ltd.png', dpi=150)
+```
+
+```python
+nei_min = 5
+nei_max = 1000
+wafer_list = ['w172', 'w174', 'w176', 'w177', 'w180', 'w181', 'w188', 'w203', 'w204', 'w206']
+
+print('wafer\tband\tA\talpha'.format(wafer, band, par[1], par[2]))
+
+fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=(8,8))
+for jwafer, wafer in enumerate(wafer_list):
+    fig.subplots_adjust(wspace=0)
+    for jband, band in enumerate([90., 150., 220.]):
+
+        group = '{:.1f}_{}'.format(band, wafer)
+
+        ff_diff = np.array(fr['AverageASDDiff']['frequency']/core.G3Units.Hz)
+        ff_sum = np.array(fr['AverageASDSum']['frequency']/core.G3Units.Hz)
+        asd_diff = np.array(fr['AverageASDDiff'][group]) / np.sqrt(2.)
+        asd_sum = np.array(fr['AverageASDSum'][group]) / np.sqrt(2.)
+
+        par = fr["AverageASDDiffFitParams"][group]
+#         ax[jband].loglog(ff_sum[ff_sum<75], asd_sum[ff_sum<75],
+#                          label='pair sum (measured)', color='0.6')
+#         ax[jband].loglog(ff_diff[ff_diff<75], asd_diff[ff_diff<75],
+#                          label='pair difference (measured)', color='k')
+        ax[jband].loglog(ff_sum, atm_noise(ff_sum, par[1], par[2]) / np.sqrt(2.),
+                         'C0--', label='low-frequency noise')
+    
+        if wafer in ['w174']:
+            ax[jband].loglog(ff_sum, atm_noise(ff_sum, par[1], par[2]) / np.sqrt(2.),
+                             'C3--', label='low-frequency noise')
+#         ax[jband].loglog(ff_sum, readout_noise(ff_sum, par[0]) / np.sqrt(2.),
+#                          'C2--', label='white noise')
+#         ax[jband].loglog(ff_sum, horizon_model(ff_sum, *list(par)) / np.sqrt(2.),
+#                          'C3--', label='total noise model')
+        print('{}\t{}\t{:.4f}\t{:.4f}'.format(wafer, band, par[1], par[2]))
+
+for jband, band in enumerate([90., 150., 220.]):
+    ax[jband].set_ylabel('current noise [pA/$\sqrt{Hz}$]', fontsize=14)
+    ax[jband].grid()
+    ax[jband].set_ylim([nei_min, nei_max])
+    ax[jband].set_xlim([0.003, 100])
+    ax[jband].annotate('{} GHz ($f_{{bias}} \in ${})'.format(band_labels[band],
+                                                       band_freqs[band]),
+                 (0.01,500), fontsize=14)
+    ax[jband].tick_params(axis='both', labelsize=14)
+
+#     ax2 = ax[jband].twinx()
+#     ax2.set_ylabel('NEP [aW/$\sqrt{Hz}$]', fontsize=14)
+#     ax2.set_ylim([nei2nep(nei_min*1e-12, median_vbias_rms[band]) * 1e18,
+#                   nei2nep(nei_max*1e-12, median_vbias_rms[band]) * 1e18])
+#     ax2.set_yscale('log')
+#     ax2.tick_params(axis='both', labelsize=14)
+
+    #     plt.suptitle(wafer)
+    #     ax[2].legend(fontsize=12)
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0)
+    ax[2].set_xlabel('frequency [Hz]', fontsize=14)
+
+plt.savefig('low_f_noise_fmux_3g.png', dpi=150)
+```
+
+```python
+pwd
+```
+
 ```python
 
 ```

@@ -21,6 +21,7 @@ import numpy as np
 from scipy.stats import sigmaclip
 import matplotlib.pyplot as plt
 from glob import glob
+from scipy.signal import decimate
 ```
 
 ## Initial investigation
@@ -105,13 +106,78 @@ plt.tight_layout()
 plt.savefig('gain_match_coeff_comparison.png', dpi=150)
 ```
 
-```python
+## Investigating low-frequency noise in the horizon noise stare
+Bill was wondering whether the hypothesis that spurious non-atmospheric noise sources dominate at very low-frequency is true. We can test this by inspecting the horizon noise stares and seeing if the low-frequency spectrum is comparable in amplitude to the low-frequency noise in our usual noise stares.
 
-print(arr.std())
+```python
+horizon_fname = '/home/adama/SPT/spt3g_papers/2019/3g_instrument/docs/code/lowf/' + \
+                'gainmatching_noise_77863968_horizon_default_current.g3'
+horizon_data = list(core.G3File(horizon_fname))
 ```
 
 ```python
-sigmaclip?
+normal_fname = '/home/adama/SPT/spt3g_papers/2019/3g_instrument/docs/code/lowf/' + \
+                'gainmatching_noise_81433244_default_current.g3'
+normal_data = list(core.G3File(normal_fname))
+```
+
+```python
+from spt3g.calibration.template_groups import get_template_groups
+bolo_tgroups = get_template_groups(horizon_data[0]["BolometerProperties"], 
+                                            per_band = True,
+                                            per_wafer = True,
+                                            include_keys = True)
+```
+
+```python
+wafers = ['w172', 'w174', 'w176', 'w177', 'w180',
+          'w181', 'w188', 'w203', 'w204', 'w206']
+bands = [90, 150, 220]
+
+for band in bands:
+    plt.figure(figsize=(10,20))
+    for jwafer, wafer in enumerate(wafers):
+        groupname = '{:.1f}_{}'.format(band, wafer)
+        group = bolo_tgroups[groupname]
+        nbolos = 0
+        avg_asd_horizon = []
+        for bolo in group:
+            if bolo in horizon_data[1]['ASD'] and \
+               np.all(np.isfinite(horizon_data[1]['ASD'][bolo])):
+                if len(avg_asd_horizon) == 0:
+                    avg_asd_horizon = horizon_data[1]['ASD'][bolo]
+                else:
+                    avg_asd_horizon += horizon_data[1]['ASD'][bolo]
+            nbolos += 1
+        avg_asd_horizon /= nbolos
+
+        nbolos = 0
+        avg_asd_normal = []
+        for bolo in group:
+            if bolo in normal_data[1]['ASD'] and \
+               np.all(np.isfinite(normal_data[1]['ASD'][bolo])):
+                if len(avg_asd_normal) == 0:
+                    avg_asd_normal = normal_data[1]['ASD'][bolo]
+                else:
+                    avg_asd_normal += normal_data[1]['ASD'][bolo]
+            nbolos += 1
+        avg_asd_normal /= nbolos
+
+        plt.subplot(5,2,jwafer+1)
+        plt.semilogx(horizon_data[1]['ASD']['frequency'] / core.G3Units.Hz,
+                   avg_asd_horizon)
+        plt.semilogx(normal_data[1]['ASD']['frequency'] / core.G3Units.Hz,
+                   avg_asd_normal)
+        plt.ylim([10,30])
+        plt.title('{} GHz: {}'.format(band, wafer))
+        plt.xlabel('frequency [Hz]')
+        plt.ylabel('current noise [pA/rtHz]')
+    plt.tight_layout()
+    plt.savefig('horizon_vs_intransition_{}.png'.format(band))
+```
+
+```python
+np.sqrt(15**2 - 10**2)
 ```
 
 ```python

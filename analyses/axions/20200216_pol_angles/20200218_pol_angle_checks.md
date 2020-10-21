@@ -18,11 +18,15 @@ This note does some checks of the output of the pol. rotation angle fitting scri
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import pickle
 from spt3g import core
 from glob import glob
 from matplotlib import gridspec
 from scipy.stats import norm
+import os.path
+
+matplotlib.rcParams.update({'font.size': 14})
 ```
 
 ```python
@@ -60,10 +64,16 @@ for fn in fnames:
 ```
 
 ```python
-plt.plot(d['scan_angles']*180/np.pi, d['scan_chi2'], 'o')
+plt.plot(d['scan_angles']*180/np.pi, d['scan_chi2'] - d['quadratic_approx_coeffs'][-1], 'o')
 plot_angles = np.linspace(np.min(d['scan_angles']), np.max(d['scan_angles']), 101)
-plt.plot(plot_angles*180/np.pi, np.polyval(d['quadratic_approx_coeffs'], plot_angles))
+plt.plot(plot_angles*180/np.pi, np.polyval(d['quadratic_approx_coeffs'], plot_angles) - d['quadratic_approx_coeffs'][-1])
 np.array(d['angle_interval'])*180/np.pi
+plt.plot([-10, 10], [1,1], '--')
+plt.axis([-2.5, 2.5, 0, 3])
+plt.xlabel('rotation angle [deg]')
+plt.ylabel('$\Delta \chi^2$')
+plt.tight_layout()
+plt.savefig('delta_chi2_cartoon.png', dpi=150)
 ```
 
 ```python
@@ -113,6 +123,14 @@ plt.legend()
 plt.savefig('pol_angle_normed_residuals.png', dpi=200)
 print('mu = {}'.format(mu))
 print('sigma = {}'.format(sigma))
+```
+
+```python
+_ = plt.hist((err_hi - err_lo)/2 *180/np.pi, bins=np.linspace(0,3,31))
+plt.xlabel('pol. angle uncertainty [deg]')
+plt.ylabel('observations / 0.1 deg')
+plt.tight_layout()
+plt.savefig('pol_angle_errors.pdf')
 ```
 
 ## Debugging

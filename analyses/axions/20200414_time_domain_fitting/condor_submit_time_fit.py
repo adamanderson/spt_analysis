@@ -57,7 +57,7 @@ for jjob in np.arange(args.njobs):
                      '{}'.format(args.fmin),
                      '{}'.format(args.fmax),
                      '{}'.format(args.nfreqs),
-                     '--pol-error 1.8',
+                     '--pol-error 0.6',
                      '--nseasons {}'.format(args.nseasons),
                      '--outfile {}'.format(outfile_name)]
     if args.uniform_data:
@@ -78,7 +78,6 @@ for jjob in np.arange(args.njobs):
                                                 request_disk = job_disk,
                                                 request_memory = job_ram,
                                                 clustertools_version = 'py3-v3',
-                                                spt3g_env=True,
-                                                new_storage=True)
+                                                spt3g_env=True)
     
     print('Creating job #{}'.format(jjob))

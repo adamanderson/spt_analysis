@@ -60,8 +60,8 @@ pixels_per_side = 500
 # experiment settings
 spt_beam_fwhm = np.pi/180/60*1.2
 spt_beam_sigma = spt_beam_fwhm / np.sqrt(8*np.log(2))
-bicep_beam_fwhm = np.pi/180/60*30
-bicep_beam_sigma = bicep_beam_fwhm / np.sqrt(8*np.log(2))
+bicep_beam_sigma = np.pi/180 * 0.21
+bicep_beam_fwhm = bicep_beam_sigma * np.sqrt(8*np.log(2))
 ```
 
 ## Including a gaussian beam
@@ -104,7 +104,7 @@ def cl_beam_corr(beam_fwhm):
 
 ```python
 plt.plot(cl_dict['ell'], B_ell_gaussian(cl_dict['ell'], 1.2), label='1.2 arcmin beam')
-plt.plot(cl_dict['ell'], B_ell_gaussian(cl_dict['ell'], 30), label='15 arcmin beam')
+plt.plot(cl_dict['ell'], B_ell_gaussian(cl_dict['ell'], 0.21*60*np.sqrt(8*np.log(2))), label='15 arcmin beam')
 plt.legend()
 plt.xlabel('$\ell$')
 plt.ylabel('$B_{\ell}$')
@@ -112,29 +112,37 @@ plt.tight_layout()
 ```
 
 ```python
-plt.figure(figsize=(12, 4))
+plt.figure(figsize=(10, 4))
 
 plt.subplot(1, 2, 1)
-plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * cl_dict['ell'] * (cl_dict['ell']+1) / (2*np.pi))
+plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * cl_dict['ell'] * (cl_dict['ell']+1) / (2*np.pi),
+         label='no beam')
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * cl_dict['ell'] * (cl_dict['ell']+1) / (2*np.pi) * \
-                         B_ell_gaussian(cl_dict['ell'], 1.2))
+                         B_ell_gaussian(cl_dict['ell'], 1.2),
+         label='SPT 150 GHz: 1.2 arcmin (FWHM)')
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * cl_dict['ell'] * (cl_dict['ell']+1) / (2*np.pi) * \
-                         B_ell_gaussian(cl_dict['ell'], 30))
+                         B_ell_gaussian(cl_dict['ell'], bicep_beam_fwhm * 180/np.pi * 60),
+         label='Keck 150 GHz: 0.21 deg ($\sigma$) (1904.01640)')
 plt.xlim([10, 2500])
 plt.xlabel('$\ell$')
-plt.ylabel('$\mathcal{D}_{\ell}$')
+plt.ylabel('$\mathcal{D}_{\ell}^{EE}$ [$\mu$K$^2$]')
 
 plt.subplot(1, 2, 2)
-plt.plot(cl_dict['ell'], cl_dict['cl']['EE'])
+plt.plot(cl_dict['ell'], cl_dict['cl']['EE'],
+         label='no beam')
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * \
-                         B_ell_gaussian(cl_dict['ell'], 1.2))
+                         B_ell_gaussian(cl_dict['ell'], 1.2),
+         label='SPT 150 GHz: 1.2 arcmin (FWHM)')
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * \
-                         B_ell_gaussian(cl_dict['ell'], 30))
+                         B_ell_gaussian(cl_dict['ell'], 0.21*60*np.sqrt(8*np.log(2))),
+         label='Keck 150 GHz: 0.21 deg ($\sigma$) (1904.01640)')
 plt.axis([10, 2500, 0, 1e-3])
 plt.xlabel('$\ell$')
-plt.ylabel('$C_{\ell}$')
+plt.ylabel('$C_{\ell}^{EE}$ [$\mu$K$^2$]')
+plt.legend()
 
 plt.tight_layout()
+plt.savefig('emode_spectrum_with_beam.png', dpi=200)
 ```
 
 ```python
@@ -142,7 +150,7 @@ plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * (2*cl_dict['ell']+1) / (2*np.pi))
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * (2*cl_dict['ell']+1) / (2*np.pi) * \
                          B_ell_gaussian(cl_dict['ell'], 1.2))
 plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * (2*cl_dict['ell']+1) / (2*np.pi) * \
-                         B_ell_gaussian(cl_dict['ell'], 30))
+                         B_ell_gaussian(cl_dict['ell'], bicep_beam_fwhm * 180/np.pi * 60))
 plt.xlim([10, 2500])
 plt.xlabel('$\ell$')
 plt.ylabel('$\mathcal{D}_{\ell}$')
@@ -158,29 +166,44 @@ np.sum(cl_dict['cl']['EE'] * (2*cl_dict['ell']+1) / (2*np.pi) * \
 ### Applying a gaussian beam
 
 ```python
-cl_dict_15arcmin_beam = cl_beam_corr(15)
-fake_sky_15arcmin_beam = qfr.cmb_flatsky(cl_dict_15arcmin_beam, ngrid=pixels_per_side, reso_rad=res_per_pixel)
+cl_dict_bicep_beam = cl_beam_corr(bicep_beam_fwhm * 180/np.pi * 60)
+fake_sky_bicep_beam = qfr.cmb_flatsky(cl_dict_bicep_beam, ngrid=pixels_per_side,
+                                      reso_rad=res_per_pixel, seed=1, use_seed=True)
 
 cl_dict_1p2arcmin_beam = cl_beam_corr(1.2)
-fake_sky_1p2arcmin_beam = qfr.cmb_flatsky(cl_dict_1p2arcmin_beam, ngrid=pixels_per_side, reso_rad=res_per_pixel)
+fake_sky_1p2arcmin_beam = qfr.cmb_flatsky(cl_dict_1p2arcmin_beam, ngrid=pixels_per_side,
+                                          reso_rad=res_per_pixel, seed=1, use_seed=True)
 ```
 
 ```python
 pol_titles = ['T', 'Q', 'U']
 
-plt.figure(1, figsize=(15,5))
+color_range = [[-350, 350], [-15, 15], [-15, 15]]
+plt.figure(1, figsize=(15,4))
 for jpol in range(3):
     plt.subplot(1,3,1+jpol)
-    plt.imshow(fake_sky_15arcmin_beam[jpol, :, :])
+    plt.imshow(fake_sky_bicep_beam[jpol, :, :],
+               vmin=color_range[jpol][0], vmax=color_range[jpol][1])
     plt.colorbar()
     plt.title(pol_titles[jpol])
+plt.tight_layout()
+plt.subplots_adjust(top=0.86)
+plt.suptitle('Keck 150 GHz resolution')
+plt.savefig('simmap_keck_res.png', dpi=200)
 
-plt.figure(2, figsize=(15,5))
+plt.figure(2, figsize=(15,4))
 for jpol in range(3):
     plt.subplot(1,3,1+jpol)
-    plt.imshow(fake_sky_1p2arcmin_beam[jpol, :, :])
+    plt.imshow(fake_sky_1p2arcmin_beam[jpol, :, :],
+               vmin=color_range[jpol][0], vmax=color_range[jpol][1])
     plt.colorbar()
     plt.title(pol_titles[jpol])
+plt.tight_layout()
+plt.subplots_adjust(top=0.86)
+plt.suptitle('SPT 150 GHz resolution')
+plt.savefig('simmap_spt3g_res.png', dpi=200)
+
+
 ```
 
 ## Low-pass Filter
@@ -214,6 +237,20 @@ plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * \
 plt.axis([10, 2500, 0, 1e-3])
 plt.xlabel('$\ell$')
 plt.ylabel('$C_{\ell}$')
+
+plt.tight_layout()
+```
+
+```python
+plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * (2*cl_dict['ell'] + 1))
+# plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * \
+#                          B_ell_gaussian(cl_dict['ell'], 1.2), 'C1')
+# plt.plot(cl_dict['ell'], cl_dict['cl']['EE'] * \
+#                          B_ell_gaussian(cl_dict['ell'], 1.2) * \
+#                          lowpass_func(cl_dict['ell'], 2700), 'C1--')
+plt.axis([1500, 3000, 0, 0.7])
+plt.xlabel('$\ell$')
+plt.ylabel('$(2\ell + 1)C_{\ell}$')
 
 plt.tight_layout()
 ```
@@ -268,7 +305,7 @@ instrument_noise[1:,:,:] = np.sqrt(2) * instrument_noise[1:,:,:]
 ```
 
 ```python
-sim_map_15arcmin_beam = fake_sky_15arcmin_beam + instrument_noise
+sim_map_bicep_beam = fake_sky_bicep_beam + instrument_noise
 sim_map_1p2arcmin_beam = fake_sky_1p2arcmin_beam + instrument_noise
 ```
 
@@ -276,7 +313,7 @@ sim_map_1p2arcmin_beam = fake_sky_1p2arcmin_beam + instrument_noise
 plt.figure(1, figsize=(15,5))
 for jpol in range(3):
     plt.subplot(1,3,1+jpol)
-    plt.imshow(sim_map_15arcmin_beam[jpol, :, :])
+    plt.imshow(sim_map_bicep_beam[jpol, :, :])
     plt.colorbar()
     plt.title(pol_titles[jpol])
     
@@ -332,7 +369,8 @@ print(result.x[0] * 180/np.pi)
 ## High-Statistics Simulations
 
 ```python
-def pol_angle_sims(num_sims, res_fwhm_arcmin, map_noise, highpass_ell=None, lowpass_ell=None):
+def pol_angle_sims(num_sims, res_fwhm_arcmin, map_noise, seed=None, highpass_ell=None, lowpass_ell=None,
+                   vary_map=True):
     cl_dict_beam_corr = cl_beam_corr(res_fwhm_arcmin)
     if highpass_ell is not None:
         for pol in cl_spectrum['cl']:
@@ -343,10 +381,21 @@ def pol_angle_sims(num_sims, res_fwhm_arcmin, map_noise, highpass_ell=None, lowp
             cl_dict_beam_corr['cl'][pol] = cl_dict_beam_corr['cl'][pol] * \
                                            lowpass_func(cl_dict['ell'], lowpass_ell)
                         
-    fake_sky_beam_corr = qfr.cmb_flatsky(cl_dict_beam_corr, ngrid=pixels_per_side, reso_rad=res_per_pixel)
+    optional_args = {}
+    if seed is not None:
+        optional_args['use_seed'] = True
+        optional_args['seed'] = seed
+        
+    if not vary_map:
+        fake_sky_beam_corr = qfr.cmb_flatsky(cl_dict_beam_corr, ngrid=pixels_per_side, reso_rad=res_per_pixel,
+                                             **optional_args)
 
     results = []
     for jsim in range(num_sims):
+        if vary_map:
+            fake_sky_beam_corr = qfr.cmb_flatsky(cl_dict_beam_corr, ngrid=pixels_per_side, reso_rad=res_per_pixel,
+                                                 **optional_args)
+        
         instrument_noise = np.random.normal(0, map_noise, size=(3, pixels_per_side,pixels_per_side))
         instrument_noise[1:,:,:] = np.sqrt(2) * instrument_noise[1:,:,:]
         sim_map_beam_corr = fake_sky_beam_corr + instrument_noise
@@ -368,19 +417,41 @@ def pol_angle_sims(num_sims, res_fwhm_arcmin, map_noise, highpass_ell=None, lowp
 ### Beam-size simulations
 
 ```python
-res_sim = np.linspace(1, 60, 20)
+res_sim = np.linspace(1, 60, 10)
 fit_angles = {}
 for res in res_sim:
-    fit_angles[res] = pol_angle_sims(num_sims=500, res_fwhm_arcmin=res, map_noise=5)
+    print('simulating sigma = {:.1f} arcmin'.format(res))
+    fit_angles[res] = {}
+    for jsky in range(20):
+        fit_angles[res][jsky] = pol_angle_sims(num_sims=20, res_fwhm_arcmin=res, map_noise=5, seed=jsky)
 ```
 
 ```python
-fit_angle_means = np.array([np.std(fit_angles[res]) for res in res_sim])
+# analytic estimate of polarization angle sensitivity from mode-counting
+res_plot = np.linspace(1, 60, 100)
+sum_of_modes = []
+for res in res_plot:
+    cl_dict_beam_corr = cl_beam_corr(res)
+    sum_of_modes.append(np.sum(cl_dict_beam_corr['cl']['EE'] * (2*cl_dict_beam_corr['ell'] + 1)))
+sum_of_modes = np.array(sum_of_modes)
+pol_angle_sensitivity = np.sqrt(1./sum_of_modes)
+pol_angle_rel_sensitivity = pol_angle_sensitivity / pol_angle_sensitivity[0]
+```
+
+```python
+fit_angle_means = []
+for res in fit_angles:
+    fit_angle_stds = [np.std(fit_angles[res][jsky]) for jsky in fit_angles[res]]
+    fit_angle_means.append(np.mean(fit_angle_stds))
+fit_angle_means = np.array(fit_angle_means)
+
 plt.plot(res_sim, fit_angle_means / fit_angle_means[0], 'o')
 plt.plot([1.2, 1.2], [0,10], '--',
          label='SPT 150 GHz: 1.2 arcmin (FWHM)')
 plt.plot([0.21*60*np.sqrt(8*np.log(2)), 0.21*60*np.sqrt(8*np.log(2))], [0,10], '--',
          label='Keck 150 GHz: 0.21 deg ($\sigma$) (1904.01640)')
+plt.plot(res_plot, pol_angle_rel_sensitivity,
+         label='expectation from mode-counting')
 plt.ylim([0,10])
 plt.legend()
 plt.xlabel('beam resolution (FWHM) [arcmin]')
@@ -403,6 +474,52 @@ fit_angles_with_filter = pol_angle_sims(num_sims=100, res_fwhm_arcmin=1.2, map_n
 
 ```python
 np.std(fit_angles_no_filter) / np.std(fit_angles_with_filter)
+```
+
+```python
+rng = np.random.RandomState(12)
+```
+
+```python
+rng.normal()
+```
+
+```python
+180*15
+```
+
+```python
+fit_angles_5uKarcmin = pol_angle_sims(num_sims=100, res_fwhm_arcmin=1.2, map_noise=5)
+fit_angles_15uKarcmin = pol_angle_sims(num_sims=100, res_fwhm_arcmin=1.2, map_noise=15)
+```
+
+```python
+_ = plt.hist(fit_angles_5uKarcmin, bins=np.linspace(-1,1,20),
+             histtype='step')
+_ = plt.hist(fit_angles_15uKarcmin, bins=np.linspace(-1,1,20),
+             histtype='step')
+```
+
+```python
+cl_dict = {'ell': np.arange(10000),
+           'cl': {'TT': 1e-3*np.ones(10000)}}
+
+fake_sky = qfr.cmb_flatsky(cl_dict, ngrid=int(40*60/1),
+                           reso_rad=np.pi/180/60 * 1, seed=1, use_seed=True)
+result = qfr.cl_flatsky(fake_sky, reso_arcmin=1, ellvec=np.linspace(0,20000,200))
+```
+
+```python
+result.keys()
+```
+
+```python
+plt.plot(result['ell'], result['cl']['TT'])
+# plt.axis([0, 4000, 1e-1, 1e3])
+```
+
+```python
+180*60/2
 ```
 
 ```python
