@@ -19,3 +19,16 @@ __pycache__
 *out
 *nc
 python_mma8451
+*dag*
+.*
+20191118_stanford_axion_scratch/sim_test/
+20191121_pol_angle_sims/sim_test_noise/
+20191121_pol_angle_sims/sim_test_nonoise/
+20191121_pol_angle_sims/sim_test_polangle/
+axiontod.py
+axion_utils.py
+master_field_mapmaker_signflip.py
+analyses/axions/20200223_simulations/sim_test_noise/
+analyses/axions/20200223_simulations/sim_test_noise_only/
+analyses/axions/20200803_signflip_tests/axion_signflip_test/
+analyses/axions/20201006_signflip_noise_tests/sim_noisefree_mock_signflip_perscan/axion_signflip_test/
