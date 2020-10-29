@@ -134,10 +134,15 @@ for jmap in np.arange(args.nmaps):
 
                 for pol in ['T', 'Q', 'U']:
                     f = plt.figure(figsize=(12,8))
+                    if pol == 'T':
+                        vmag = 50
+                    else:
+                        vmag = 10
                     plt.imshow(frame[pol] / (core.G3Units.microkelvin),
-                               vmin=-10, vmax=10)
+                               vmin=-1*vmag, vmax=vmag)
                     plt.colorbar()
                     plt.title(pol)
+                    plt.tight_layout()
                     plt.savefig('{}_map_{}_{}.png'.format(os.path.basename(args.output).split('.')[0], jmap, pol),
                                 dpi=200)
                     plt.close(f)
