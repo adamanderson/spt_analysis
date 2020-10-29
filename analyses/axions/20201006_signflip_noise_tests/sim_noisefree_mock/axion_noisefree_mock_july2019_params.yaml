@@ -70,7 +70,7 @@ pointing_model:             offline
 ######################################
 split_by_band:              True
 split_by_wafer:             False
-split_left_right:           True
+split_left_right:           False
 
 ######################################
 # Include/exclude lists

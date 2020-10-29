@@ -11,7 +11,7 @@ otherfiles = 'axiontod.py'
 
 simstub_fnames = glob('/sptgrid/user/kferguson/axion_perscan_maps_2019/simstub_*_150GHz*g3.gz')
 for fname in simstub_fnames:
-    jobstr = os.path.basename(fname).lstrip('simstub_').rstrip('.g3.gz')
+    jobstr = os.path.basename(fname).lstrip('simstub_')[:-6]
     print('JOB noisefree-mock-sims-{} makemanymaps.submit'.format(jobstr))
     print('VARS noisefree-mock-sims-{} InputFiles=\"{}\"'.format(jobstr, fname))
     print('VARS noisefree-mock-sims-{} OutputFiles=\"/sptgrid/user/adama/20201006_signflip_noise_tests/noisefree-mock-sims-{}.g3.gz\"'.format(jobstr, jobstr))
