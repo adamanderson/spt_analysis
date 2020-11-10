@@ -49,7 +49,7 @@ for field in mean_pol_angles:
                  linestyle='none', marker='o')
     chi2 = np.sum(np.asarray(mean_pol_angles[field])**2 / (np.asarray(std_pol_angles[field])**2 / nsims[field]))
     ndf = len(mean_pol_angles[field])
-    pval = stats.chi2.cdf(chi2, ndf)
+    pval = 1 - stats.chi2.cdf(chi2, ndf)
     plt.xlabel('observation index')
     plt.ylabel('pol. angle [deg] in noise-free simulation')
     plt.title('{}: $\chi^2$ / ndf = {:.1f} / {}, p = {:.3f}'.format(field, chi2, ndf, pval))
