@@ -9,10 +9,10 @@ ptsrcfile = '1500d_ptsrc_and_decrement_list.txt'
 logdir = '/scratch/adama/condor_logs/20201006_signflip_noise_tests_2'
 mapmaker = 'master_field_mapmaker_signflip.py'
 otherfiles = 'axiontod.py'
-equalweights_equalflags = True
+equal_weights_and_flags = True
 
 simstub_fnames = glob('/sptgrid/user/kferguson/axion_perscan_maps_2019/simstub_*_150GHz*g3.gz')
-if equalweights_equalflags:
+if equal_weights_and_flags:
     simstub_fnames = [fname for fname in simstub_fnames \
                       if 'no_equal_weights_equal_flags' not in fname]
 else:
