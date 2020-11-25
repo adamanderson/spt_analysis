@@ -6,6 +6,7 @@ nskies = 5
 per_scan_sims = True
 pol_angles = True
 equal_weights_and_flags = True
+logdir = '/scratch/adama/condor_logs/20201006_signflip_noise_tests_2'
 
 if equal_weights_and_flags:
     yaml_file = 'axion_perscan_map_params.yaml'
@@ -19,7 +20,7 @@ else:
 for fname in simstub_fnames:
     for jsky in range(nskies):
         jobstr = '{}_{}{:04d}'.format(os.path.basename(fname).lstrip('simstub_')[:-6], jobtag, jsky)
-        signflip_outfile = '/sptgrid/user/adama/20201006_signflip_noise_tests_2/noisefree-sims-{}.g3.gz'.format(jobstr)
+        signflip_outfile = '/sptgrid/user/adama/20201006_signflip_noise_tests_2/noisefree_perscan_maps_{}.g3.gz'.format(jobstr)
 
         fitsflag = '-m /sptgrid/user/adama/20201006_signflip_noise_tests_2/mock_skies/total/total_150ghz_map_3g_{:04d}.fits'.format(jsky)
 
@@ -30,15 +31,17 @@ for fname in simstub_fnames:
             print('VARS noisefree-sims-{} ExtraArgs=\"--sim --config-file {} -z {}\"'.format(jobstr, yaml_file, fitsflag))
             print('VARS noisefree-sims-{} JobID=\"noisefree-sims-{}\"'.format(jobstr, jobstr))
             print('VARS noisefree-sims-{} YAMLfile=\"{}\"'.format(jobstr, yaml_file))
+            print('VARS noisefree-sims-{} LogDir=\"{}\"'.format(jobstr, logdir))
 
-        coadd_file = '/sptgrid/user/adama/20201006_signflip_noise_tests_2/noisefree-mock-sims_150GHz_coadd_test_{:04d}.g3.gz'.format(jsky)
+        coadd_file = '/sptgrid/user/adama/20201006_signflip_noise_tests_2/noisefree_mock_sims_150GHz_{:04d}.g3.gz'.format(jsky)
 
         if pol_angles:
             print('JOB calc-polangle-{} calcsignflip.submit'.format(jobstr))
             print('VARS calc-polangle-{} InputFiles=\"{} {}\"'.format(jobstr, signflip_outfile, coadd_file))
-            print('VARS calc-polangle-{} OutputFiles=\"/sptgrid/user/adama/20201006_signflip_noise_tests_2/calc-polangle-{}.pkl\"'.format(jobstr, jobstr))
+            print('VARS calc-polangle-{} OutputFiles=\"/sptgrid/user/adama/20201006_signflip_noise_tests_2/calc_polangle_{}.pkl\"'.format(jobstr, jobstr))
             print('VARS calc-polangle-{} ExtraArgs=\"--nmaps 1000 --mapid *150GHz --keep-mock-cmb\"'.format(jobstr))
             print('VARS calc-polangle-{} JobID=\"calc-polangle-{}\"'.format(jobstr, jobstr))
+            print('VARS calc-polangle-{} LogDir=\"{}\"'.format(jobstr, logdir))
 
         if per_scan_sims and pol_angles:
             print('PARENT noisefree-sims-{} CHILD calc-polangle-{}'.format(jobstr, jobstr))

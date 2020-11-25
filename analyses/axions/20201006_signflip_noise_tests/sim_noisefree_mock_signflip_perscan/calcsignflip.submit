@@ -1,9 +1,9 @@
 executable = calcsignflip.sh
 universe = vanilla
 
-error = /scratch/adama/condor_logs/20201006_signflip_noise_tests/$(JobID)-err.log
-output = /scratch/adama/condor_logs/20201006_signflip_noise_tests/$(JobID)-out.log
-log = /scratch/adama/condor_logs/20201006_signflip_noise_tests/condor_noisefree_mock_signflip_polstats.log
+error = $(LogDir)/$(JobID)-err.log
+output = $(LogDir)/$(JobID)-out.log
+log = $(LogDir)/condor_noisefree_mock_signflip_polstats.log
 
 +WANT_RCC_ciconnect = True
 +ProjectName = "spt.all"
