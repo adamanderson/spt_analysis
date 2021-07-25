@@ -1,6 +1,10 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import pickle
+import os
+
+# pkl file with obsids
+fname_obsids = os.path.join(os.path.dirname(__file__), 'obsids_1500d_2019.pkl')
 
 def window_function(f, tn):
     return np.sum( np.exp(-2.*np.pi*1j * f * tn) )
@@ -29,7 +33,7 @@ plt.tight_layout()
 plt.savefig('window_psd_test.png', dpi=200)
 
 # Realistic frequencies
-with open('obsids_1500d_2019.pkl', 'rb') as f:
+with open(fname_obsids, 'rb') as f:
     obsids = pickle.load(f)
 freqs_spt = np.linspace(-20, 20, 100001)
 
