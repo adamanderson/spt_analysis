@@ -13,8 +13,8 @@ files_to_transfer = '{}, {}, {}'.format('limits.sh',
 submit_file = 'limits.submit'
 mode = 'simulation'
 
-njobs = 1000
-n_sims_per_job = 5
+njobs = 2500
+n_sims_per_job = 20
 
 fmin = 0.01
 fmax = 2.0
