@@ -1,0 +1,1 @@
+/home/adama/SPT/spt3g_software/scratch/kferguson/axion_oscillation/timeseries_analysis/condor_setup.py
