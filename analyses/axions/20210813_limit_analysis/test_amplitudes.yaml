@@ -1,0 +1,53 @@
+n_angle_sims: 100
+seed: 234
+freq:
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+amp:
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+subfield:
+  - ra0hdec-44.75
+  - ra0hdec-44.75
+  - ra0hdec-44.75
+  - ra0hdec-44.75
+  - ra0hdec-44.75
+upper_limit:
+  - False
+  - False
+  - False
+  - False
+  - False
+signal_phase:
+  - null
+  - null
+  - null
+  - null
+  - null
+outfile_tag:
+  - freq0.02_amp0.0005_randphase_ra0hdec-44.75
+  - freq0.02_amp0.001_randphase_ra0hdec-44.75
+  - freq0.02_amp0.005_randphase_ra0hdec-44.75
+  - freq0.02_amp0.01_randphase_ra0hdec-44.75
+  - freq0.02_amp0.05_randphase_ra0hdec-44.75
+n_condor_jobs:
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+n_sims_per_condor_job:
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+times_file: /sptgrid/user/adama/20210407_multiband_limits/angle_sims/sim_angles_20210809_181815_seed=2_freq=0.13_amp=0.006_ra0hdec-44.75.pkl
+grid_dir: /sptgrid/user/adama/20210813_limit_analysis/
+log_dir: /scratch/adama/condor_logs/20210813_limit_analysis/

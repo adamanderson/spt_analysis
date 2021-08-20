@@ -1,52 +1,149 @@
-n_angle_sims:
-  - 100
-  - 100
-  - 100
-  - 100
-seed:
-  - 234
-  - 234
-  - 234
-  - 234
+n_angle_sims: 100
+seed: 234
 freq:
-  - 0.12
-  - 0.12
-  - 0.12
-  - 0.12
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.02
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
 amp:
+  - 0.0
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
+  - 0.006
   - 0.006
   - 0.006
   - 0.006
   - 0.006
 subfield:
+  - null
+  - ra0hdec-44.75
+  - ra0hdec-52.25
+  - ra0hdec-59.75
+  - ra0hdec-67.25
+  - ra0hdec-44.75
+  - ra0hdec-52.25
+  - ra0hdec-59.75
+  - ra0hdec-67.25
+  - ra0hdec-44.75
+  - ra0hdec-52.25
+  - ra0hdec-59.75
+  - ra0hdec-67.25
   - ra0hdec-44.75
   - ra0hdec-52.25
   - ra0hdec-59.75
   - ra0hdec-67.25
 upper_limit:
-  - True
-  - True
-  - True
-  - True
-outfile_name:
-  - sim_angles_freq0.13_amp0.006_ra0hdec-44.75.pkl
-  - sim_angles_freq0.13_amp0.006_ra0hdec-52.25.pkl
-  - sim_angles_freq0.13_amp0.006_ra0hdec-59.75.pkl
-  - sim_angles_freq0.13_amp0.006_ra0hdec-67.25.pkl
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+  - False
+signal_phase:
+  - null
+  - null
+  - null
+  - null
+  - null
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - null
+  - null
+  - null
+  - null
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
 outfile_tag:
-  - freq0.13_amp0.006_ra0hdec-44.75
-  - freq0.13_amp0.006_ra0hdec-52.25
-  - freq0.13_amp0.006_ra0hdec-59.75
-  - freq0.13_amp0.006_ra0hdec-67.25
+  - freq0.02_amp0.0_randphase_ra0hdec-44.75
+  - freq0.02_amp0.006_randphase_ra0hdec-44.75
+  - freq0.02_amp0.006_randphase_ra0hdec-52.25
+  - freq0.02_amp0.006_randphase_ra0hdec-59.75
+  - freq0.02_amp0.006_randphase_ra0hdec-67.25
+  - freq0.02_amp0.006_0phase_ra0hdec-44.75
+  - freq0.02_amp0.006_0phase_ra0hdec-52.25
+  - freq0.02_amp0.006_0phase_ra0hdec-59.75
+  - freq0.02_amp0.006_0phase_ra0hdec-67.25
+  - freq0.2_amp0.006_randphase_ra0hdec-44.75
+  - freq0.2_amp0.006_randphase_ra0hdec-52.25
+  - freq0.2_amp0.006_randphase_ra0hdec-59.75
+  - freq0.2_amp0.006_randphase_ra0hdec-67.25
+  - freq0.2_amp0.006_0phase_ra0hdec-44.75
+  - freq0.2_amp0.006_0phase_ra0hdec-52.25
+  - freq0.2_amp0.006_0phase_ra0hdec-59.75
+  - freq0.2_amp0.006_0phase_ra0hdec-67.25
 n_condor_jobs:
-  - 5
-  - 5
-  - 5
-  - 5
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
 n_sims_per_condor_job:
-  - 2
-  - 2
-  - 2
-  - 2
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
 times_file: /sptgrid/user/adama/20210407_multiband_limits/angle_sims/sim_angles_20210809_181815_seed=2_freq=0.13_amp=0.006_ra0hdec-44.75.pkl
-  
+grid_dir: /sptgrid/user/adama/20210813_limit_analysis/
+log_dir: /scratch/adama/condor_logs/20210813_limit_analysis/
