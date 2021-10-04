@@ -4,8 +4,8 @@ jupyter:
     text_representation:
       extension: .md
       format_name: markdown
-      format_version: '1.2'
-      jupytext_version: 1.7.1
+      format_version: '1.0'
+      jupytext_version: 0.8.6
   kernelspec:
     display_name: Python 3
     language: python
@@ -17,8 +17,10 @@ from ksztools import *
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import simps
+from numpy.linalg import inv
 import pandas as pd
 import pickle
+import ksztools
 ```
 
 ```python
@@ -68,7 +70,7 @@ prior = {'tau': 0.0073, 'delta_z_re': None, 'A_late': None, 'alpha_late': None,
 # General forecast parameters
 fsky = 0.7
 
-model_4pt_Nbin = kSZModel(tau=x0['tau'],
+model_4pt_Nbin = ksztools.kSZModel(tau=x0['tau'],
                           delta_z_re=x0['delta_z_re'],
                           A_late=x0['A_late'],
                           alpha_late=x0['alpha_late'],
@@ -76,41 +78,6 @@ model_4pt_Nbin = kSZModel(tau=x0['tau'],
                           noise_uKarcmin=1.0,
                           ell_bin_edges=ell_bin_edges,
                           Cshot=Cshot_matrix)
-```
-
-```python
-fisher_4pt = Fisher4Point(model_4pt_Nbin, fsky=0.7)
-nlkk, clkk, deriv_clkk, fisher_matrix = fisher_4pt.calc_fisher(x0, dx, prior)
-```
-
-```python
-print(pd.DataFrame(fisher_matrix))
-```
-
-```python
-np.diag(np.sqrt(inv(fisher_matrix)))
-```
-
-```python
-1./np.sqrt(fisher_matrix[0,0])
-```
-
-```python
-1./np.sqrt(fisher_matrix[1,1])
-```
-
-```python
-contour = cov_ellipse([0.06, x0['delta_z_re']], fisher_matrix, color='k', label='1 uK^@2')
-# plt.figure(figsize=(8,6))
-ax = plt.subplot(1,1,1)
-ax.add_artist(contour)
-plt.axis([0.02, 0.1,
-          x0['delta_z_re']-20, x0['delta_z_re']+20])
-# plt.axis([0.05, 0.07, -1.5, 4])
-plt.grid()
-plt.xlabel('$\\tau$')
-plt.ylabel('$\Delta z_{re}$')
-plt.tight_layout()
 ```
 
 ## Long Runs
@@ -138,11 +105,11 @@ for nbin in [1, 4, 10, 20]:
 
 ```python
 plt.subplot(2,1,1)
-plt.semilogy(nbins, tau_by_bins, 'o')
+plt.plot(nbins, tau_by_bins, 'o')
 plt.ylabel('$\sigma(\\tau)$')
 
 plt.subplot(2,1,2)
-plt.semilogy(nbins, deltaz_by_bins, 'o')
+plt.plot(nbins, deltaz_by_bins, 'o')
 plt.ylabel('$\sigma(\Delta z)$')
 plt.xlabel('$N_{bins}$')
 plt.tight_layout()
@@ -226,6 +193,69 @@ plt.axis([1,6,0,0.012])
 plt.subplot(2,1,2)
 plt.plot(noiselevels, deltaz_by_noise, 'o-')
 plt.axis([1,6,0,3.5])
+```
+
+```python
+with open('long_runs/test_default_1uKarcmin_fsky0p7_1arcmin_nbins=1.pkl_default_nbins=1.pkl', 'rb') as f:
+    d = pickle.load(f)
+    
+errs_marg = np.diag(np.sqrt(inv(d['fisher_matrix'])))
+errs_unmarg = 1./np.diag(np.sqrt(d['fisher_matrix']))
+
+print('sigma(tau) = {}'.format(errs_marg[0]))
+print('sigma(delta z) = {}\n'.format(errs_marg[1]))
+print('sigma(tau) [unmarg.] = {}'.format(errs_unmarg[0]))
+print('sigma(delta z) [unmarg.] = {}\n'.format(errs_unmarg[1]))
+
+contour = cov_ellipse([0.06, x0['delta_z_re']], d['fisher_matrix'], 'r', '')
+ax = plt.subplot(1,1,1)
+ax.add_patch(contour)
+plt.axis([0.052, 0.068, 0.4, 2.0])
+plt.xlabel('$\\tau$')
+plt.ylabel('$\Delta z_{re}$')
+plt.tight_layout()
+```
+
+```python
+d['fisher_matrix']
+```
+
+```python
+ np.savetxt('fisher.tsv', d['fisher_matrix'], delimiter='\t')
+```
+
+```python
+from matplotlib.colors import LogNorm
+plt.imshow(d['fisher_matrix'][4:, 4:], norm=LogNorm())
+```
+
+```python
+plt.imshow(-1*d['fisher_matrix'][4:, 4:], norm=LogNorm())
+```
+
+## Scratch
+
+```python
+row1 = 0
+col1 = 0
+col_offset1 = 0
+nbins = 5
+nparams = nbins* (nbins+1) / 2 + 4
+for jparam in np.arange(4, nparams):
+    deriv_shot_matrix1 = np.zeros((nbins, nbins))
+    deriv_shot_matrix1[row1, col1] = 1
+    deriv_shot_matrix1[col1, row1] = 1
+    col1 += 1
+    if col1 == nbins:
+        row1 += 1
+        col1 = col_offset1 + 1
+        col_offset1 += 1
+    
+    print(deriv_shot_matrix1)
+```
+
+```python
+ksztools.model
 ```
 
 ```python

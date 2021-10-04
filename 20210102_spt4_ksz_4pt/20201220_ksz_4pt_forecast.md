@@ -400,18 +400,14 @@ plt.title('No prior on $A_{late}$ and $\\alpha_{late}$')
 plt.tight_layout()
 plt.legend()
 
-plt.savefig('reion_params_s4_spt4.png', dpi=200)
+plt.savefig('reion_params_all.png', dpi=200)
 
 with open('ksz_4pt_covariances.pkl', 'wb') as f:
     pickle.dump(cov, f)
 ```
 
 ```python
-cov
-```
-
-```python
-# No prior on A_late, alpha_late
+# 50% prior on A_late, alpha_late
 ax = plt.subplot(1,1,1)
 planck_tau = Rectangle((0.060-0.007, -100), 2*0.007, 200,
                        color='tab:red', alpha=0.3, linewidth=0,
@@ -462,7 +458,116 @@ plt.title('50% prior on $A_{late}$ and $\\alpha_{late}$')
 plt.tight_layout()
 plt.legend()
 
-plt.savefig('reion_params_s4_spt4.png', dpi=200)
+plt.savefig('reion_params_all_50pc_Alate_prior.png', dpi=200)
+```
+
+```python
+# 50% prior on A_late, alpha_late + Lmin=50
+ax = plt.subplot(1,1,1)
+planck_tau = Rectangle((0.060-0.007, -100), 2*0.007, 200,
+                       color='tab:red', alpha=0.3, linewidth=0,
+                       label='Planck')
+ax.add_patch(planck_tau)
+plt.plot([-100,100], [1.2, 1.2], 'k--', linewidth=1)
+plt.plot([0.06, 0.06], [-100, 100], 'k--', linewidth=1)
+
+tau_by_noise = []
+deltaz_by_noise = []
+expt_list = ['s4deepv3r025', 's4wide', 'sobaseline', 'spt4_C3', 'spt3g', 's4deepv3r025plusspt4HF']
+expt_name_list = ['s4deepv3r025', 's4wide', 'sobaseline', 'spt4_C3', 'spt3g', 's4deepv3r025plusspt4HF']
+color_list = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:brown', 'tab:purple']
+for expt, expt_name, color in zip(expt_list, expt_name_list, color_list):
+    with open('outputs/final_Lmin=50_{}_nbins=20.pkl'.format(expt), 'rb') as f:
+        d = pickle.load(f)
+    
+    # 50% priors on A_late and alpha_late
+    d['fisher_matrix'][2,2] += 1/(0.5**2)
+    d['fisher_matrix'][3,3] += 1/(0.5**2)
+    
+    errs_marg = np.diag(np.sqrt(inv(d['fisher_matrix'])))
+    errs_unmarg = 1./np.diag(np.sqrt(d['fisher_matrix']))
+    
+    print('{}'.format(expt_name))
+    print('sigma(tau) = {}'.format(errs_marg[0]))
+    print('sigma(delta z) = {}'.format(errs_marg[1]))
+    print('sigma(A_late) = {}'.format(errs_marg[2]))
+    print('sigma(alpha_late) = {}\n'.format(errs_marg[3]))
+    print('sigma(tau) [unmarg.] = {}'.format(errs_unmarg[0]))
+    print('sigma(delta z) [unmarg.] = {}'.format(errs_unmarg[1]))
+    print('sigma(A_late) [unmarg.] = {}'.format(errs_unmarg[2]))
+    print('sigma(alpha_late) [unmarg.] = {}\n'.format(errs_unmarg[3]))
+    
+    tau_by_noise.append(errs_marg[0])
+    deltaz_by_noise.append(errs_marg[1])
+    
+    contour = cov_ellipse([0.06, 1.2], d['fisher_matrix'], color, '{}'.format(expt_name))
+    ax.add_patch(contour)
+    
+    cov[expt] = inv(d['fisher_matrix'])[:4,:4]
+    
+plt.axis([0.035, 0.085, -1.5, 4])
+# plt.axis([-0.1, 0.22, -12, 14])
+plt.xlabel('$\\tau$')
+plt.ylabel('$\Delta z_{re}$')
+plt.title('50% prior on $A_{late}$ and $\\alpha_{late}$, $L_{min} = 50$')
+plt.tight_layout()
+plt.legend()
+
+plt.savefig('reion_params_all_50pc_Alate_prior_Lmin=50.png', dpi=200)
+```
+
+```python
+# no prior on A_late, alpha_late + Lmin=50
+ax = plt.subplot(1,1,1)
+planck_tau = Rectangle((0.060-0.007, -100), 2*0.007, 200,
+                       color='tab:red', alpha=0.3, linewidth=0,
+                       label='Planck')
+ax.add_patch(planck_tau)
+plt.plot([-100,100], [1.2, 1.2], 'k--', linewidth=1)
+plt.plot([0.06, 0.06], [-100, 100], 'k--', linewidth=1)
+
+tau_by_noise = []
+deltaz_by_noise = []
+expt_list = ['s4deepv3r025', 's4wide', 'sobaseline', 'spt4_C3', 'spt3g', 's4deepv3r025plusspt4HF']
+expt_name_list = ['s4deepv3r025', 's4wide', 'sobaseline', 'spt4_C3', 'spt3g', 's4deepv3r025plusspt4HF']
+color_list = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:brown', 'tab:purple']
+for expt, expt_name, color in zip(expt_list, expt_name_list, color_list):
+    with open('outputs/final_Lmin=50_{}_nbins=20.pkl'.format(expt), 'rb') as f:
+        d = pickle.load(f)
+    
+    errs_marg = np.diag(np.sqrt(inv(d['fisher_matrix'])))
+    errs_unmarg = 1./np.diag(np.sqrt(d['fisher_matrix']))
+    
+    print('{}'.format(expt_name))
+    print('sigma(tau) = {}'.format(errs_marg[0]))
+    print('sigma(delta z) = {}'.format(errs_marg[1]))
+    print('sigma(A_late) = {}'.format(errs_marg[2]))
+    print('sigma(alpha_late) = {}\n'.format(errs_marg[3]))
+    print('sigma(tau) [unmarg.] = {}'.format(errs_unmarg[0]))
+    print('sigma(delta z) [unmarg.] = {}'.format(errs_unmarg[1]))
+    print('sigma(A_late) [unmarg.] = {}'.format(errs_unmarg[2]))
+    print('sigma(alpha_late) [unmarg.] = {}\n'.format(errs_unmarg[3]))
+    
+    tau_by_noise.append(errs_marg[0])
+    deltaz_by_noise.append(errs_marg[1])
+    
+    contour = cov_ellipse([0.06, 1.2], d['fisher_matrix'], color, '{}'.format(expt_name))
+    ax.add_patch(contour)
+    
+    cov[expt] = inv(d['fisher_matrix'])[:4,:4]
+    
+plt.axis([0.035, 0.085, -1.5, 4])
+# plt.axis([-0.1, 0.22, -12, 14])
+plt.xlabel('$\\tau$')
+plt.ylabel('$\Delta z_{re}$')
+plt.title('50% prior on $A_{late}$ and $\\alpha_{late}$, $L_{min} = 50$')
+plt.tight_layout()
+plt.legend()
+
+plt.savefig('reion_params_all_50pc_Alate_prior_Lmin=50.png', dpi=200)
+
+with open('ksz_4pt_covariances_Lmin=50.pkl', 'wb') as f:
+    pickle.dump(cov, f)
 ```
 
 ## Scratch
