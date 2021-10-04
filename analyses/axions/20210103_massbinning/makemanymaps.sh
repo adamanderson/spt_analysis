@@ -94,5 +94,3 @@ gfal-copy file://$PWD/`basename $output` gsiftp://osg-gridftp.grid.uchicago.edu:
 trap - EXIT
 
 echo Finished
-
-exit 0

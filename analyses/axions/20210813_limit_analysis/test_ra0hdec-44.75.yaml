@@ -1,0 +1,23 @@
+n_angle_sims:
+  - 100
+seed:
+  - 234
+freq:
+  - 0.12
+amp:
+  - 0.006
+subfield:
+  - ra0hdec-44.75
+upper_limit:
+  - True
+outfile_name:
+  - sim_angles_freq0.13_amp0.006_ra0hdec-44.75.pkl
+outfile_tag:
+  - freq0.13_amp0.006_ra0hdec-44.75
+n_condor_jobs:
+  - 5
+n_sims_per_condor_job:
+  - 2
+times_file: /sptgrid/user/adama/20210407_multiband_limits/angle_sims/sim_angles_20210809_181815_seed=2_freq=0.13_amp=0.006_ra0hdec-44.75.pkl
+grid_dir: /sptgrid/user/adama/20210813_limit_analysis/
+log_dir: /scratch/adama/condor_logs/20210813_limit_analysis/

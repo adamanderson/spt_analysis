@@ -1,0 +1,30 @@
+executable = simulate_fits.sh
+universe = vanilla
+
+error = /scratch/adama/condor_logs/20210103_massbinning/massbinning_test_fitfreq=0.005-0.015_amp=1.000_freq=0.010-$(Process)-err.log
+output = /scratch/adama/condor_logs/20210103_massbinning/massbinning_test_fitfreq=0.005-0.015_amp=1.000_freq=0.010-$(Process)-out.log
+log = /scratch/adama/condor_logs/20210103_massbinning/condor.log
+
++WANT_RCC_ciconnect = True
++ProjectName = "spt.all"
+request_cpus = 1
+Requirements = (OSGVO_OS_STRING == "RHEL 7") && (HAS_CVMFS_spt_opensciencegrid_org) && (OSG_HOSTNAME =!= "its-condor-ce2.syr.edu") && (OSG_HOSTNAME =!= "its-condor-ce3.syr.edu")
+
+request_disk = 2GB
+request_memory = 2GB
+
+transfer_output_files = ""
+should_transfer_files = YES
+run_as_owner = False
+when_to_transfer_output = ON_EXIT
+transfer_input_files = simulate_time_domain.py, simulate_fits.sh, simulate_time_domain.py, obsids_1500d_2019.pkl, /home/adama/SPT/spt3g_software/scratch/kferguson/axion_oscillation/timefittools.py
+use_x509userproxy = True
+transfer_executable = True
+periodic_release =  (NumJobStarts < 5) && ((CurrentTime - EnteredCurrentStatus) > (60*60))
+
+max_retries = 0
+
+arguments = 5 0.005 0.015 100 1.0 0.01 --pol-error 1.5 --obs obsids_1500d_2019.pkl --outfile /sptgrid/user/adama/20210103_massbinning/massbinning_test_fitfreq=0.005-0.015_amp=1.000_freq=0.010-$(Process).pkl
+
+
+queue 5

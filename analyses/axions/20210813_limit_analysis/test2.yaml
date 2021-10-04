@@ -1,0 +1,19 @@
+n_angle_sims: 100
+seed: 234
+freq:
+  - 1.0
+amp:
+  - 0.0
+subfield:
+  - null
+upper_limit:
+  - False
+outfile_tag:
+  - freq1.0_amp0.0_ra0hdec-44.75
+n_condor_jobs:
+  - 2
+n_sims_per_condor_job:
+  - 1
+times_file: /sptgrid/user/adama/20210407_multiband_limits/angle_sims/sim_angles_20210809_181815_seed=2_freq=0.13_amp=0.006_ra0hdec-44.75.pkl
+grid_dir: /sptgrid/user/adama/20210813_limit_analysis/
+log_dir: /scratch/adama/condor_logs/20210813_limit_analysis/

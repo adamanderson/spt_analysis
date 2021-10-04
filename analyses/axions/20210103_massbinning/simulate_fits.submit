@@ -1,0 +1,30 @@
+executable = simulate_fits.sh
+universe = vanilla
+
+error = $(LogDir)/$(JobID)-err.log
+output = $(LogDir)/$(JobID)-out.log
+log = $(LogDir)/condor.log
+
++WANT_RCC_ciconnect = True
++ProjectName = "spt.all"
+request_cpus = 1
+Requirements = (OSGVO_OS_STRING == "RHEL 7") && (HAS_CVMFS_spt_opensciencegrid_org) && (OSG_HOSTNAME =!= "its-condor-ce2.syr.edu") && (OSG_HOSTNAME =!= "its-condor-ce3.syr.edu")
+
+request_disk = 2GB
+request_memory = 2GB
+
+transfer_output_files = ""
+should_transfer_files = YES
+run_as_owner = False
+when_to_transfer_output = ON_EXIT
+transfer_input_files = $(Script), $(TransferFiles)
+use_x509userproxy = True
+transfer_executable = True
+periodic_release =  (NumJobStarts < 5) && ((CurrentTime - EnteredCurrentStatus) > (60*60))
+
+max_retries = 0
+
+arguments = $(Args)
+
+
+queue $(NJobs)
